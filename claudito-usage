@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Usage summary for the Claudito usage widget.
+
+    claudito-usage          -> JSON on stdout
+
+Combines three local sources, all on this machine:
+  - `claude auth status`: plan and account (cached for 10 minutes)
+  - $XDG_RUNTIME_DIR/claudito/statusline.json, written by claudito-statusline:
+    plan rate limits, current session context and cost
+  - ~/.claude/projects/**/*.jsonl transcripts: tokens per day, project and model
+    (per-file results are cached by size and mtime in ~/.cache/claudito)
+"""
+import datetime as dt
+import glob
+import json
+import os
+import subprocess
+import sys
+import time
+
+HOME = os.path.expanduser("~")
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+STATUSLINE = os.path.join(RUNTIME, "claudito", "statusline.json")
+CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.join(HOME, ".cache"), "claudito")
+AUTH_CACHE = os.path.join(CACHE_DIR, "auth.json")
+FILES_CACHE = os.path.join(CACHE_DIR, "transcripts.json")
+CONFIG_DIR = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(HOME, ".claude")
+PROJECTS = os.path.join(CONFIG_DIR, "projects")
+CACHE_VERSION = 3
+DAYS = 30
+
+
+def read_json(path, default=None):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def write_json(path, data):
+    os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(data, f)
+    os.replace(tmp, path)
+
+
+# ---------- Account ----------
+
+def account():
+    cached = read_json(AUTH_CACHE)
+    if cached and time.time() - cached.get("_at", 0) < 600:
+        return cached
+    try:
+        out = subprocess.run(["claude", "auth", "status"], capture_output=True, text=True,
+                             timeout=15, stdin=subprocess.DEVNULL).stdout
+        data = json.loads(out)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return cached or {}
+    keep = {k: data.get(k) for k in ("loggedIn", "authMethod", "email", "orgName",
+                                     "subscriptionType", "planTier", "loginExpiresAt")}
+    keep["_at"] = time.time()
+    try:
+        write_json(AUTH_CACHE, keep)
+    except OSError:
+        pass
+    return keep
+
+
+# ---------- Live session (status line) ----------
+
+def live():
+    data = read_json(STATUSLINE)
+    if not data:
+        return None
+    now = time.time()
+    limits = {}
+    for key in ("five_hour", "seven_day"):
+        lim = (data.get("rate_limits") or {}).get(key)
+        if not isinstance(lim, dict):
+            continue
+        resets = lim.get("resets_at")
+        pct = lim.get("used_percentage")
+        # The window rolled over since Claude Code last reported it.
+        if isinstance(resets, (int, float)) and resets < now:
+            pct, resets = 0, None
+        limits[key] = {"percent": pct, "resetsAt": resets}
+    ctx = data.get("context_window") or {}
+    cost = data.get("cost") or {}
+    ws = data.get("workspace") or {}
+    return {
+        "updated": data.get("_saved"),
+        "sessionId": data.get("session_id"),
+        "sessionName": data.get("session_name"),
+        "model": (data.get("model") or {}).get("display_name"),
+        "version": data.get("version"),
+        "project": project_of(data.get("cwd") or ws.get("current_dir") or ws.get("project_dir")),
+        "contextPercent": ctx.get("used_percentage"),
+        "contextSize": ctx.get("context_window_size"),
+        "costUsd": cost.get("total_cost_usd"),
+        "durationMs": cost.get("total_duration_ms"),
+        "apiDurationMs": cost.get("total_api_duration_ms"),
+        "linesAdded": cost.get("total_lines_added"),
+        "linesRemoved": cost.get("total_lines_removed"),
+        "limits": limits,
+    }
+
+
+# ---------- Transcripts ----------
+
+_roots = {}
+
+
+def project_of(cwd):
+    """Name of the git repo containing cwd, or the folder itself."""
+    cwd = (cwd or "").rstrip("/")
+    if not cwd:
+        return "?"
+    if cwd not in _roots:
+        d = cwd
+        while d and d != "/" and not os.path.exists(os.path.join(d, ".git")):
+            d = os.path.dirname(d)
+        _roots[cwd] = os.path.basename(d if d and d != "/" else cwd) or "~"
+    return _roots[cwd]
+
+
+def parse_file(path):
+    """Per-day buckets for one transcript: {day: {project: {model: counters}}}."""
+    seen = set()
+    days = {}
+    sessions = {}
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if '"assistant"' not in line or '"usage"' not in line:
+                continue
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            if ev.get("type") != "assistant":
+                continue
+            msg = ev.get("message") or {}
+            usage = msg.get("usage") or {}
+            mid = msg.get("id") or ev.get("requestId") or ev.get("uuid")
+            if mid in seen:
+                continue   # one API message is logged once per content block
+            seen.add(mid)
+            model = msg.get("model") or "?"
+            if model.startswith("<"):
+                continue   # synthetic messages
+            try:
+                ts = dt.datetime.fromisoformat(ev["timestamp"].replace("Z", "+00:00")).astimezone()
+            except (KeyError, ValueError):
+                continue
+            day = ts.date().isoformat()
+            project = project_of(ev.get("cwd"))
+            c = days.setdefault(day, {}).setdefault(project, {}).setdefault(
+                model, {"in": 0, "out": 0, "cacheW": 0, "cacheR": 0, "msgs": 0})
+            c["in"] += usage.get("input_tokens") or 0
+            c["out"] += usage.get("output_tokens") or 0
+            c["cacheW"] += usage.get("cache_creation_input_tokens") or 0
+            c["cacheR"] += usage.get("cache_read_input_tokens") or 0
+            c["msgs"] += 1
+            sid = ev.get("sessionId")
+            if sid:
+                s = sessions.setdefault(sid, {"first": ts.timestamp(), "last": ts.timestamp(), "project": project})
+                s["first"] = min(s["first"], ts.timestamp())
+                s["last"] = max(s["last"], ts.timestamp())
+    return {"days": days, "sessions": sessions}
+
+
+def transcripts():
+    cache = read_json(FILES_CACHE, {})
+    if cache.get("version") != CACHE_VERSION:
+        cache = {"version": CACHE_VERSION, "files": {}}
+    files = cache["files"]
+    found = set()
+    for path in glob.glob(os.path.join(PROJECTS, "**", "*.jsonl"), recursive=True):
+        try:
+            st = os.stat(path)
+        except OSError:
+            continue
+        found.add(path)
+        entry = files.get(path)
+        if entry and entry["size"] == st.st_size and entry["mtime"] == st.st_mtime:
+            continue
+        try:
+            files[path] = {"size": st.st_size, "mtime": st.st_mtime, **parse_file(path)}
+        except OSError:
+            continue
+    for gone in set(files) - found:
+        del files[gone]
+    try:
+        write_json(FILES_CACHE, cache)
+    except OSError:
+        pass
+    return files.values()
+
+
+def zero():
+    return {"in": 0, "out": 0, "cacheW": 0, "cacheR": 0, "msgs": 0}
+
+
+def add(a, b):
+    for k in a:
+        a[k] += b.get(k, 0)
+
+
+def totals(entries):
+    today = dt.date.today()
+    first = today - dt.timedelta(days=DAYS - 1)
+    week_start = today - dt.timedelta(days=6)
+    daily = {(first + dt.timedelta(days=i)).isoformat(): zero() for i in range(DAYS)}
+    periods = {"today": zero(), "week": zero(), "month": zero()}
+    projects, models = {}, {}
+    sessions = {}
+    for e in entries:
+        for day, per_project in e["days"].items():
+            d = dt.date.fromisoformat(day)
+            if d < first:
+                continue
+            for project, per_model in per_project.items():
+                for model, c in per_model.items():
+                    add(daily[day], c)
+                    add(periods["month"], c)
+                    if d >= week_start:
+                        add(periods["week"], c)
+                    if d == today:
+                        add(periods["today"], c)
+                    add(projects.setdefault(project, zero()), c)
+                    add(models.setdefault(model, zero()), c)
+        for sid, s in e["sessions"].items():
+            cur = sessions.setdefault(sid, dict(s))
+            cur["first"] = min(cur["first"], s["first"])
+            cur["last"] = max(cur["last"], s["last"])
+
+    def count_sessions(since):
+        t = dt.datetime.combine(since, dt.time()).timestamp()
+        return sum(1 for s in sessions.values() if s["last"] >= t)
+
+    periods["today"]["sessions"] = count_sessions(today)
+    periods["week"]["sessions"] = count_sessions(week_start)
+    periods["month"]["sessions"] = count_sessions(first)
+
+    def ranked(d, n):
+        rows = [{"name": k, **v} for k, v in d.items()]
+        rows.sort(key=lambda r: r["in"] + r["out"] + r["cacheW"], reverse=True)
+        return rows[:n]
+
+    return {
+        "periods": periods,
+        "daily": [{"day": k, **v} for k, v in sorted(daily.items())],
+        "projects": ranked(projects, 5),
+        "models": ranked(models, 5),
+    }
+
+
+def main():
+    out = {"generated": time.time(), "account": account(), "live": live()}
+    out.update(totals(transcripts()))
+    json.dump(out, sys.stdout)
+
+
+if __name__ == "__main__":
+    main()

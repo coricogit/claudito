@@ -21,6 +21,25 @@ or helmet for each kind of work:
 
 Click it to poke it. Under it, a caption says what it's doing and in which project.
 
+## Usage panel widget
+
+**Claudito Usage** goes in a panel: a tiny Claudito plus how much of the
+5-hour window you've used. Its face changes as you get closer to the limit.
+Click it for:
+
+- your plan and account (email hidden until you click it), and until when you're signed in
+- plan limits: 5-hour window and week, with when each one resets
+- the current Claude Code session: name, model, project, context used, time,
+  lines changed and API-equivalent cost
+- tokens written/read, replies and sessions for today, 7 and 30 days
+- a 14-day chart and the projects and models you use most
+
+Plan limits and the live session come from Claude Code's status line, so they
+update while Claude Code is open. The installer sets `claudito-statusline` as
+your status line unless you already have one. The history comes from your
+local transcripts in `~/.claude/projects`, and the account from
+`claude auth status`. Nothing is sent anywhere.
+
 ## How it works
 
 `claudito-hook` runs as an async [Claude Code hook](https://docs.claude.com/en/docs/claude-code/hooks)

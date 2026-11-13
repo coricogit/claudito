@@ -1,0 +1,15 @@
+{
+  "KPlugin": {
+    "Id": "org.corico.claudito.usage",
+    "Name": "Claudito Usage",
+    "Name[es]": "Claudito: uso de Claude",
+    "Description": "Claude plan limits, current session, tokens and account, with a tiny Claudito in your panel",
+    "Description[es]": "Límites del plan de Claude, sesión actual, tokens y cuenta, con un mini Claudito en el panel",
+    "Icon": "office-chart-bar",
+    "Authors": [{ "Name": "corico" }],
+    "Category": "System Information",
+    "Version": "0.1.0"
+  },
+  "KPackageStructure": "Plasma/Applet",
+  "X-Plasma-API-Minimum-Version": "6.0"
+}
