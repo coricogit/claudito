@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">
+  <defs>
+    <pattern id="c" width="8" height="8" patternUnits="userSpaceOnUse">
+      <rect width="8" height="8" fill="#8B5E3C"/>
+      <path d="M0 4H8M4 0V8" stroke="#6B4226" stroke-width="2"/>
+    </pattern>
+  </defs>
+  <path d="M4 50 C14 44 22 44 26 46 L74 46 C78 44 86 44 96 50 C84 54 16 54 4 50 Z" fill="#6B4226"/>
+  <path d="M22 47 C22 22 34 14 50 14 C66 14 78 22 78 47 Z" fill="url(#c)" stroke="#4a2c17" stroke-width="2"/>
+  <path d="M30 40 C36 30 64 30 70 40" stroke="#4a2c17" stroke-width="2" fill="none"/>
+  <ellipse cx="50" cy="13" rx="8" ry="4" fill="#4a2c17"/>
+  <path d="M50 13 L40 6 M50 13 L60 6" stroke="#4a2c17" stroke-width="3" stroke-linecap="round"/>
+</svg>

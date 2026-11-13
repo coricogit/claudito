@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Claude Code hook for Claudito, the desktop buddy.
+
+Reads the hook event JSON on stdin and records what Claude is doing in
+$XDG_RUNTIME_DIR/claudito/state.json, which the Plasma widget polls.
+It never prints anything and always exits 0, so it can't disturb Claude Code.
+"""
+import fcntl
+import json
+import os
+import sys
+import time
+
+RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+DIR = os.path.join(RUNTIME, "claudito")
+STATE = os.path.join(DIR, "state.json")
+KEEP_SECONDS = 24 * 3600
+
+SEARCH = {"Read", "Grep", "Glob", "LS", "LSP", "NotebookRead"}
+BUILD = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+TERMINAL = {"Bash", "PowerShell", "Monitor", "BashOutput", "KillShell", "TaskStop"}
+EXPLORE = {"WebFetch", "WebSearch"}
+LEAD = {"Agent", "Task", "Workflow", "SendMessage", "ListAgents"}
+PLAN = {"TodoWrite", "TaskCreate", "TaskUpdate", "EnterPlanMode", "ExitPlanMode",
+        "CronCreate", "ScheduleWakeup"}
+CREATE = {"Artifact", "Skill"}
+ASK = {"AskUserQuestion"}
+
+
+def mode_for_tool(tool):
+    for mode, names in (("search", SEARCH), ("build", BUILD), ("terminal", TERMINAL),
+                        ("explore", EXPLORE), ("lead", LEAD), ("plan", PLAN),
+                        ("create", CREATE), ("waiting", ASK)):
+        if tool in names:
+            return mode
+    if tool.startswith("mcp__"):
+        return "create"
+    return "work"
+
+
+def short(text, limit=48):
+    text = " ".join(str(text or "").split())
+    return text if len(text) <= limit else text[:limit - 1] + "…"
+
+
+def detail_for_tool(tool, args):
+    if not isinstance(args, dict):
+        return ""
+    path = args.get("file_path") or args.get("notebook_path") or args.get("path")
+    if tool in BUILD | {"Read"} and path:
+        return os.path.basename(str(path).rstrip("/"))
+    if tool in TERMINAL:
+        return short(args.get("description") or args.get("command"))
+    if tool in ("Grep", "Glob"):
+        return short(args.get("pattern"))
+    if tool == "WebSearch":
+        return short(args.get("query"))
+    if tool == "WebFetch":
+        url = str(args.get("url") or "")
+        return short(url.split("//", 1)[-1].split("/", 1)[0])
+    if tool in ("Agent", "Task"):
+        return short(args.get("description"))
+    if tool == "Skill":
+        return short(args.get("skill"))
+    if tool == "Artifact":
+        return short(args.get("action") or "publish")
+    return ""
+
+
+def event_to_state(ev):
+    """(mode, tool, detail) for a hook event, or None to ignore it."""
+    name = ev.get("hook_event_name", "")
+    tool = str(ev.get("tool_name") or "")
+    args = ev.get("tool_input")
+    if name == "SessionStart":
+        return "wake", "", ""
+    if name == "UserPromptSubmit":
+        return "thinking", "", ""
+    if name == "PreToolUse":
+        return mode_for_tool(tool), tool, detail_for_tool(tool, args)
+    if name == "PostToolUse":
+        # Back to thinking between tools, unless it was a question for the user.
+        return ("thinking", "", "") if tool not in ASK else None
+    if name == "PostToolUseFailure":
+        return "oops", tool, detail_for_tool(tool, args)
+    if name in ("PermissionRequest", "Notification"):
+        return "waiting", tool, short(ev.get("message")) if name == "Notification" else tool
+    if name == "Stop":
+        return "done", "", ""
+    if name == "SessionEnd":
+        return "sleep", "", ""
+    return None
+
+
+def main():
+    try:
+        ev = json.load(sys.stdin)
+    except ValueError:
+        return
+    now = time.time()
+    result = event_to_state(ev)
+    if result is None:
+        return
+    mode, tool, detail = result
+    session = str(ev.get("session_id") or "default")
+
+    os.makedirs(DIR, mode=0o700, exist_ok=True)
+    with open(os.path.join(DIR, "lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            with open(STATE) as f:
+                state = json.load(f)
+            if not isinstance(state.get("sessions"), dict):
+                raise ValueError
+        except (OSError, ValueError):
+            state = {"sessions": {}}
+        sessions = state["sessions"]
+        old = sessions.get(session, {})
+        # Hooks run async, so an older event may land after a newer one.
+        if old.get("ts", 0) > now:
+            return
+        sessions[session] = {
+            "mode": mode,
+            "tool": tool,
+            "detail": detail,
+            "project": os.path.basename(str(ev.get("cwd") or "").rstrip("/")),
+            "ts": now,
+        }
+        for sid in [s for s, v in sessions.items() if now - v.get("ts", 0) > KEEP_SECONDS]:
+            del sessions[sid]
+        state["latest"] = session
+        state["updated"] = now
+        tmp = STATE + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(state, f)
+        os.replace(tmp, STATE)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:  # never break Claude Code
+        pass
+    sys.exit(0)

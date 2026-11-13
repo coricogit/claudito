@@ -1,0 +1,14 @@
+{
+  "KPlugin": {
+    "Id": "org.corico.claudito",
+    "Name": "Claudito",
+    "Description": "Claude Code as a little desktop buddy that wears a different hat for each kind of work",
+    "Description[es]": "Claude Code como un muñequito en el escritorio que se pone un sombrero distinto según lo que hace",
+    "Icon": "face-smile",
+    "Authors": [{ "Name": "corico" }],
+    "Category": "Fun and Games",
+    "Version": "0.1.0"
+  },
+  "KPackageStructure": "Plasma/Applet",
+  "X-Plasma-API-Minimum-Version": "6.0"
+}
