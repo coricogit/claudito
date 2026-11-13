@@ -56,7 +56,7 @@ of terminal commands, never file contents.
 Needs KDE Plasma 6, Python 3 and `jq`.
 
 ```bash
-git clone <this repo> ~/src/claudito
+git clone https://github.com/coricogit/claudito.git ~/src/claudito
 ~/src/claudito/install.sh
 ```
 
