@@ -2,7 +2,9 @@
 
 A little character on your KDE Plasma desktop that shows what
 [Claude Code](https://claude.com/claude-code) is doing, with a different hat
-or helmet for each kind of work:
+or helmet for each kind of work.
+
+*[Leer en español](README.es.md)*
 
 | Claude Code is… | Hat | Animation |
 |---|---|---|
@@ -60,12 +62,15 @@ git clone https://github.com/coricogit/claudito.git ~/src/claudito
 ~/src/claudito/install.sh
 ```
 
-It links `~/.local/bin/claudito-hook`, adds the hooks to
-`~/.claude/settings.json` (your other settings and hooks are kept; a backup goes
-to `settings.json.claudito-backup`) and installs the widget. Then right-click
-the desktop > *Add Widgets* > **Claudito**. It also works in a panel.
+It links `claudito-hook`, `claudito-statusline` and `claudito-usage` into
+`~/.local/bin`, adds the hooks and the status line to `~/.claude/settings.json`
+(your other settings and hooks are kept, an existing status line is left alone,
+and a backup goes to `settings.json.claudito-backup`) and installs both widgets.
+Then right-click > *Add Widgets*: **Claudito** on the desktop (it also fits in a
+panel) and **Claudito Usage** in the panel.
 
 New Claude Code sessions pick the hooks up on their own. In a session that is
 already open, run `/hooks` once.
 
-Remove it with `./install.sh --uninstall`.
+Update with `git pull && ./install.sh`. Remove everything with
+`./install.sh --uninstall`.
