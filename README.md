@@ -74,3 +74,10 @@ already open, run `/hooks` once.
 
 Update with `git pull && ./install.sh`. Remove everything with
 `./install.sh --uninstall`.
+
+## Windows 11
+
+There's a Windows version in [`windows/`](windows/README.md): the same buddy in
+a transparent window and the usage panel behind a tray icon, built with PySide6
+on the same `Character.qml` and scripts. Install it with
+`py windows\install.py`.

@@ -76,3 +76,10 @@ que ya estaba abierta, ejecuta `/hooks` una vez.
 
 Para actualizar: `git pull && ./install.sh`. Para quitarlo todo:
 `./install.sh --uninstall`.
+
+## Windows 11
+
+Hay una versión para Windows en [`windows/`](windows/README.es.md): el mismo
+muñeco en una ventana transparente y el panel de uso tras un icono en la
+bandeja, hecha con PySide6 sobre el mismo `Character.qml` y los mismos scripts.
+Se instala con `py windows\install.py`.
