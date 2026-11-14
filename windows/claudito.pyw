@@ -386,6 +386,7 @@ class Claudito(QObject):
 
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self._on_tray)
+        self.tray.setIcon(QIcon(tray_pixmap("sleep")))
         self.tray.show()
 
     def _on_tray(self, reason):
