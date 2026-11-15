@@ -69,10 +69,11 @@ reinstala si la mueves). Para quitarlo todo:
 - haz clic y da un saltito
 - clic derecho para el menú
 
-**El icono de la bandeja** es un mini Claudito cuya cara sigue tu ventana de 5
-horas: contento, concentrado o sudando. Le sale un **!** naranja cuando Claude
-Code te está esperando. Pasa el ratón por encima para ver qué hace Claude y
-tus límites.
+**El icono de la bandeja** es un mini Claudito cuya cara sigue lo que hace
+Claude: dormido, concentrado mientras trabaja, contento cuando termina y
+preocupado si algo falla. Le sale un **!** naranja cuando Claude Code te está
+esperando. Pasa el ratón por encima para ver qué hace Claude y cuántos tokens
+ha escrito hoy.
 
 - **clic**: el panel de uso
 - **clic central**: mostrar u ocultar el muñeco
@@ -89,19 +90,17 @@ de tareas > Otros iconos de la bandeja del sistema*.
 
 Haz clic en el icono de la bandeja para ver:
 
-- tu plan y tu cuenta (el correo, oculto hasta que haces clic) y hasta cuándo
-  tienes la sesión iniciada
-- los límites del plan: ventana de 5 horas y semana, con cuándo se reinicia
-  cada uno
-- la sesión actual de Claude Code: nombre, modelo, proyecto, contexto usado,
-  tiempo, líneas cambiadas y coste equivalente en la API
+- tu plan y tu cuenta (el correo, oculto hasta que haces clic)
 - tokens escritos y leídos, respuestas y sesiones de hoy, 7 y 30 días
 - una gráfica de 14 días y los proyectos y modelos que más usas
+- un botón para abrir tu página de uso en claude.ai
 
-Se cierra al hacer clic fuera. Los límites del plan y la sesión actual salen
-de la línea de estado de Claude Code, así que se actualizan mientras Claude
-Code está abierto; el historial sale de los archivos de sesión del propio
-Claude Code. No se envía nada a ningún sitio.
+Se cierra al hacer clic fuera. Todo sale de archivos que Claude Code guarda en
+tu ordenador (`~/.claude.json` y los historiales de sesión de
+`~/.claude\projects`); no se envía nada a ningún sitio. En Windows no se
+muestran los límites del plan ni la sesión en curso: Claude Code solo los pasa
+a su línea de estado, y la pestaña Code de la aplicación de escritorio de
+Claude no la ejecuta. Puedes consultarlos en claude.ai.
 
 ## Cómo funciona
 

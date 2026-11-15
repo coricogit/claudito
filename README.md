@@ -68,9 +68,10 @@ it). Remove everything with `py windows\install.py --uninstall`.
 - click it to make it hop
 - right-click it for the menu
 
-**The tray icon** is a mini Claudito whose face follows your 5-hour window:
-happy, focused, sweating. An orange **!** appears when Claude Code is waiting
-for you. Hover it to see what Claude is doing and your limits.
+**The tray icon** is a mini Claudito whose face follows what Claude is doing:
+asleep, focused while it works, happy when it's done, worried when something
+fails. An orange **!** appears when Claude Code is waiting for you. Hover it to
+see what Claude is doing and how many tokens it has written today.
 
 - **click**: the usage panel
 - **middle-click**: show or hide the buddy
@@ -87,16 +88,17 @@ Other system tray icons*.
 
 Click the tray icon for:
 
-- your plan and account (email hidden until you click it), and until when you're signed in
-- plan limits: 5-hour window and week, with when each one resets
-- the current Claude Code session: name, model, project, context used, time,
-  lines changed and API-equivalent cost
+- your plan and account (email hidden until you click it)
 - tokens written/read, replies and sessions for today, 7 and 30 days
 - a 14-day chart and the projects and models you use most
+- a button to open your usage page on claude.ai
 
-It closes when you click elsewhere. Plan limits and the live session come from
-Claude Code's status line, so they update while Claude Code is open; the
-history comes from Claude Code's own session files. Nothing is sent anywhere.
+It closes when you click elsewhere. Everything comes from files Claude Code
+keeps on your computer (`~/.claude.json` and the session histories in
+`~/.claude\projects`); nothing is sent anywhere. Plan limits and the live
+session aren't shown on Windows: Claude Code only reports them to its status
+line, which the Code tab of the Claude desktop app doesn't run. Check them on
+claude.ai.
 
 ## How it works
 

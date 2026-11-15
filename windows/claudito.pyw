@@ -42,7 +42,7 @@ TEXT = {
         "onTop": "Always on top",
         "autostart": "Start with Windows",
         "quit": "Quit",
-        "tip5h": "5 h: {five} · week: {week}",
+        "tipToday": "Today: {out} tokens written",
         "already": "Claudito is already running (look in the tray).",
     },
     "es": {
@@ -53,7 +53,7 @@ TEXT = {
         "onTop": "Siempre encima",
         "autostart": "Iniciar con Windows",
         "quit": "Salir",
-        "tip5h": "5 h: {five} · semana: {week}",
+        "tipToday": "Hoy: {out} tokens escritos",
         "already": "Claudito ya está abierto (búscalo en la bandeja).",
     },
 }
@@ -165,11 +165,10 @@ class Backend(QObject):
         if fast:
             self.refreshUsage()
 
-    def limit_percent(self, key):
-        live = self._usage_data.get("live") or {}
-        lim = (live.get("limits") or {}).get(key) or {}
-        pct = lim.get("percent")
-        return pct if isinstance(pct, (int, float)) else -1
+    def tokens_today(self):
+        today = (self._usage_data.get("periods") or {}).get("today") or {}
+        out = today.get("out")
+        return out if isinstance(out, (int, float)) else None
 
     # ----- what the buddy is doing (set from QML, used by the tray) -----
     def _get_activity(self):
@@ -412,16 +411,16 @@ class Claudito(QObject):
             self.set_buddy_visible(not self.buddy.isVisible())
 
     def _update_tray(self):
-        five = self.backend.limit_percent("five_hour")
-        week = self.backend.limit_percent("seven_day")
-        mood = "sleep" if five < 0 else "worried" if five >= 80 else "focus" if five >= 50 else "happy"
-        self.tray.setIcon(QIcon(tray_pixmap(mood, waiting=self.backend.mode == "waiting")))
+        mode = self.backend.mode
+        mood = ("sleep" if mode == "sleep" else "worried" if mode in ("waiting", "oops")
+                else "happy" if mode in ("idle", "done", "wake") else "focus")
+        self.tray.setIcon(QIcon(tray_pixmap(mood, waiting=mode == "waiting")))
 
-        def pct(v):
-            return "?" if v < 0 else f"{round(v)} %"
-
-        lines = ["Claudito: " + self.backend.activity if self.backend.activity else "Claudito",
-                 tr("tip5h").format(five=pct(five), week=pct(week))]
+        lines = ["Claudito: " + self.backend.activity if self.backend.activity else "Claudito"]
+        out = self.backend.tokens_today()
+        if out is not None:
+            text = f"{out / 1000:.1f} k" if out >= 1000 else str(int(out))
+            lines.append(tr("tipToday").format(out=text))
         self.tray.setToolTip("\n".join(lines))
 
 
