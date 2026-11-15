@@ -7,11 +7,12 @@ import QtQuick.Controls
 import "../../plasma/org.corico.claudito.usage/contents/ui"
 import "../../plasma/org.corico.claudito.usage/contents/code/strings.js" as S
 
-// Claude usage panel, opened from the tray icon: account, token history and
-// the projects and models you use most. Same layout as the Plasma panel
-// (plasma/org.corico.claudito.usage/contents/ui/main.qml), without KDE parts
-// and without plan limits or the live session: those come from Claude Code's
-// status line, which the Code tab of the Claude desktop app doesn't run.
+// Claude usage panel, opened from the tray icon: account, plan limits, token
+// history and the projects and models you use most. Same layout as the Plasma
+// panel (plasma/org.corico.claudito.usage/contents/ui/main.qml), without KDE
+// parts and without the live session. Plan limits come from Claude Code's
+// status line, which the terminal runs but the Code tab of the Claude desktop
+// app does not, so they only show after a terminal session has reported them.
 Window {
   id: root
 
@@ -24,17 +25,26 @@ Window {
 
   // Close like a flyout when you click elsewhere.
   onActiveChanged: if (!active && visible) hide()
-  onVisibleChanged: if (visible) scroll.contentItem.contentY = 0
+  onVisibleChanged: if (visible) { now = Date.now() / 1000; scroll.contentItem.contentY = 0 }
 
   SystemPalette { id: pal; colorGroup: SystemPalette.Active }
 
   readonly property color fg: pal.windowText
   readonly property color bg: pal.window
   readonly property color accent: "#EE7E55"
+  readonly property color good: "#2F9E44"
+  readonly property color warn: "#E67700"
+  readonly property color bad: "#E03131"
   readonly property real small: 11
   readonly property int pad: 14
+  readonly property bool es: Qt.locale().name.indexOf("es") === 0
+
+  readonly property string noLimitsText: es
+    ? "Los límites del plan y cuándo se reinician llegan desde Claude Code en una terminal (comando claude). Abre una sesión ahí y aparecerán; la pestaña Code de la app de escritorio no los comparte."
+    : "Plan limits and reset times come from Claude Code in a terminal (the claude command). Start a session there and they'll show up; the Code tab of the Claude desktop app doesn't share them."
 
   property var usage: null
+  property real now: Date.now() / 1000
   property bool showEmail: false
   property int period: 0   // 0 today, 1 week, 2 month
 
@@ -49,7 +59,19 @@ Window {
     try { usage = JSON.parse(backend.usageText) } catch (e) {}
   }
 
+  Timer {
+    interval: 1000; running: root.visible; repeat: true
+    onTriggered: root.now = Date.now() / 1000
+  }
+
   readonly property var account: usage ? usage.account || {} : {}
+  readonly property var live: usage ? usage.live : null
+  readonly property var limits: live ? live.limits || {} : {}
+  readonly property var five: limits.five_hour || null
+  readonly property var week: limits.seven_day || null
+  readonly property real fivePct: five && typeof five.percent === "number" ? five.percent : -1
+  readonly property real weekPct: week && typeof week.percent === "number" ? week.percent : -1
+  readonly property bool liveActive: !!(live && live.updated && now - live.updated < 120)
   // The face follows what Claudito is doing (the buddy window sets backend.mode).
   readonly property string mood: {
     switch (backend.mode) {
@@ -70,6 +92,28 @@ Window {
     if (n >= 1e3) return Number(n / 1e3).toLocaleString(loc, "f", 1) + " k"
     return Number(n).toLocaleString(loc, "f", 0)
   }
+
+  function pctText(v) { return v < 0 ? "?" : Math.round(v) + " %" }
+
+  function fmtDuration(sec) {
+    sec = Math.max(0, Math.round(sec))
+    var d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60)
+    if (d > 0) return d + " d " + h + " h"
+    if (h > 0) return h + " h " + m + " min"
+    if (m > 0) return m + " min"
+    return sec + " s"
+  }
+
+  function resetText(lim) {
+    if (!lim || !lim.resetsAt) return lim && lim.percent === 0 ? S.t("reset") : ""
+    var left = lim.resetsAt - now
+    if (left <= 0) return S.t("reset")
+    var d = new Date(lim.resetsAt * 1000)
+    var when = d.toLocaleString(Qt.locale(), left < 86400 ? "HH:mm" : "ddd d, HH:mm")
+    return S.t("resetsIn").arg(fmtDuration(left)) + " (" + when + ")"
+  }
+
+  function levelColor(v) { return v >= 80 ? bad : v >= 50 ? warn : good }
 
   function maskEmail(e) {
     if (!e) return ""
@@ -165,6 +209,33 @@ Window {
         ColumnLayout {
           width: scroll.availableWidth
           spacing: 10
+
+          // ---------- Limits ----------
+          Section { title: S.t("limits") }
+
+          Txt {
+            visible: !root.five && !root.week
+            text: root.noLimitsText
+            opacity: 0.7
+            wrapMode: Text.Wrap
+            Layout.fillWidth: true
+            Layout.leftMargin: root.pad
+            Layout.rightMargin: root.pad
+          }
+
+          LimitRow { visible: !!root.five; label: S.t("fiveHour"); value: root.fivePct; lim: root.five }
+          LimitRow { visible: !!root.week; label: S.t("week"); value: root.weekPct; lim: root.week }
+
+          Txt {
+            visible: (!!root.five || !!root.week) && !!root.live && !root.liveActive
+            text: S.t("staleLimits").arg(root.live ? root.fmtDuration(root.now - root.live.updated) : "")
+            font.pixelSize: root.small
+            opacity: 0.6
+            wrapMode: Text.Wrap
+            Layout.fillWidth: true
+            Layout.leftMargin: root.pad
+            Layout.rightMargin: root.pad
+          }
 
           // ---------- Usage ----------
           Section { title: S.t("usage") }
@@ -314,6 +385,24 @@ Window {
       Layout.leftMargin: root.pad
     }
     Sep {}
+  }
+
+  component LimitRow: ColumnLayout {
+    id: limitRow
+    property string label
+    property real value: -1
+    property var lim
+    Layout.fillWidth: true
+    Layout.leftMargin: root.pad
+    Layout.rightMargin: root.pad
+    spacing: 3
+    RowLayout {
+      Layout.fillWidth: true
+      Txt { text: limitRow.label; Layout.fillWidth: true }
+      Txt { text: root.pctText(limitRow.value); font.bold: true; color: root.levelColor(limitRow.value) }
+    }
+    Bar { value: limitRow.value; tint: root.levelColor(limitRow.value) }
+    Txt { text: root.resetText(limitRow.lim); font.pixelSize: root.small; opacity: 0.6 }
   }
 
   component Stat: ColumnLayout {

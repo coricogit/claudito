@@ -30,6 +30,37 @@ try:
 except OSError:
     pass
 
+def spanish():
+    for var in ("LC_ALL", "LC_TIME", "LANG"):
+        if os.environ.get(var):
+            return os.environ[var].startswith("es")
+    if os.name == "nt":
+        try:
+            import ctypes
+            # Primary language id 0x0a is Spanish (es-ES, es-MX...).
+            return ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF == 0x0A
+        except (AttributeError, OSError):
+            pass
+    return False
+
+
+DAYS = {True: ("lun", "mar", "mié", "jue", "vie", "sáb", "dom"),
+        False: ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")}
+
+
+def resets(lim):
+    """When a limit window resets, in local time: '02:10', or 'Tue 12:00' if not within a day."""
+    at = lim.get("resets_at")
+    now = time.time()
+    if not isinstance(at, (int, float)) or at <= now:
+        return ""
+    t = time.localtime(at)
+    clock = time.strftime("%H:%M", t)
+    if at - now < 86400:
+        return f" ({clock})"
+    return f" ({DAYS[spanish()][t.tm_wday]} {clock})"
+
+
 parts = []
 model = (data.get("model") or {}).get("display_name")
 if model:
@@ -39,10 +70,9 @@ pct = ctx.get("used_percentage")
 if isinstance(pct, (int, float)):
     parts.append(f"ctx {pct:.0f}%")
 limits = data.get("rate_limits") or {}
-five = (limits.get("five_hour") or {}).get("used_percentage")
-if isinstance(five, (int, float)):
-    parts.append(f"5h {five:.0f}%")
-week = (limits.get("seven_day") or {}).get("used_percentage")
-if isinstance(week, (int, float)):
-    parts.append(f"7d {week:.0f}%")
+for key, label in (("five_hour", "5h"), ("seven_day", "7d")):
+    lim = limits.get(key) or {}
+    used = lim.get("used_percentage")
+    if isinstance(used, (int, float)):
+        parts.append(f"{label} {used:.0f}%{resets(lim)}")
 print(" · ".join(parts) or "Claudito")
