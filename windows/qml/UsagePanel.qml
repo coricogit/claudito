@@ -34,6 +34,17 @@ Window {
   readonly property color bad: "#E03131"
   readonly property real small: 11
   readonly property int pad: 14
+  readonly property bool es: Qt.locale().name.indexOf("es") === 0
+
+  // Plan limits and the live session only come from Claude Code's status
+  // line, which the terminal runs but the Code tab of the Claude desktop app
+  // does not.
+  readonly property string noLimitsText: es
+    ? "Los límites del plan y cuándo se reinician solo llegan desde Claude Code en una terminal (comando claude): la pestaña Code de la app de escritorio no los comparte."
+    : "Plan limits and reset times only come from Claude Code in a terminal (the claude command): the Code tab of the Claude desktop app doesn't share them."
+  readonly property string noSessionText: es
+    ? "Los datos de la sesión en curso también llegan solo desde Claude Code en una terminal."
+    : "Live session details also come only from Claude Code in a terminal."
 
   property var usage: null
   property real now: Date.now() / 1000
@@ -198,7 +209,7 @@ Window {
 
           Txt {
             visible: !root.five && !root.week
-            text: S.t("noLimits")
+            text: root.noLimitsText
             opacity: 0.7
             wrapMode: Text.Wrap
             Layout.fillWidth: true
@@ -222,7 +233,7 @@ Window {
 
           Txt {
             visible: !root.live
-            text: S.t("noSession")
+            text: root.noSessionText
             opacity: 0.7
             wrapMode: Text.Wrap
             Layout.fillWidth: true

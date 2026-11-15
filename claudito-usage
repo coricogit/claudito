@@ -176,6 +176,7 @@ def transcripts():
         cache = {"version": CACHE_VERSION, "files": {}}
     files = cache["files"]
     found = set()
+    changed = False
     for path in glob.glob(os.path.join(PROJECTS, "**", "*.jsonl"), recursive=True):
         try:
             st = os.stat(path)
@@ -187,14 +188,17 @@ def transcripts():
             continue
         try:
             files[path] = {"size": st.st_size, "mtime": st.st_mtime, **parse_file(path)}
+            changed = True
         except OSError:
             continue
     for gone in set(files) - found:
         del files[gone]
-    try:
-        write_json(FILES_CACHE, cache)
-    except OSError:
-        pass
+        changed = True
+    if changed or not os.path.exists(FILES_CACHE):
+        try:
+            write_json(FILES_CACHE, cache)
+        except OSError:
+            pass
     return files.values()
 
 

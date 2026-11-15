@@ -64,6 +64,22 @@ def tr(key):
     return TEXT[LANG].get(key) or TEXT["en"][key]
 
 
+def log_error(what):
+    """pythonw has no console: append the traceback to claudito.log instead
+    (kept under ~200 KB by starting over when it grows past that)."""
+    import traceback
+    text = time.strftime("%Y-%m-%d %H:%M:%S ") + "claudito: " + what + "\n" + traceback.format_exc()
+    if sys.stderr:
+        print(text, file=sys.stderr)
+    try:
+        path = os.path.join(compat.data_dir(), "claudito.log")
+        mode = "w" if os.path.exists(path) and os.path.getsize(path) > 200_000 else "a"
+        with open(path, mode, encoding="utf-8") as f:
+            f.write(text + "\n")
+    except OSError:
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Backend shared with QML as `backend`
 # ---------------------------------------------------------------------------
@@ -126,8 +142,8 @@ class Backend(QObject):
             out = {"generated": time.time(), "account": mod.account(), "live": mod.live()}
             out.update(mod.totals(mod.transcripts()))
             self._usageReady.emit(json.dumps(out))
-        except Exception as e:  # keep the last good data
-            print("claudito: usage failed:", e, file=sys.stderr)
+        except Exception:  # keep the last good data
+            log_error("usage failed")
 
     def _set_usage(self, text):
         self._usage = text

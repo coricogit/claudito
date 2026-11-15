@@ -11,7 +11,9 @@ On Windows this module:
   - fixes the bits of claudito-usage that assume POSIX paths or commands
 On Linux and macOS it changes nothing, so the app can also be tried there.
 """
+import glob
 import importlib.machinery
+import json
 import importlib.util
 import os
 import runpy
@@ -72,8 +74,19 @@ def load_script(name):
     return mod
 
 
+_usage_mod = None
+
+
 def load_usage():
-    """claudito-usage as a module, with its POSIX assumptions fixed."""
+    """claudito-usage as a module, with its POSIX assumptions fixed.
+    Loaded once and reused: the tray app asks for it every few seconds."""
+    global _usage_mod
+    if _usage_mod is None:
+        _usage_mod = _load_usage()
+    return _usage_mod
+
+
+def _load_usage():
     mod = load_script("claudito-usage")
     roots = {}
 
@@ -97,19 +110,71 @@ def load_usage():
 
     mod.project_of = project_of
     mod.subprocess = _Subprocess()
+
+    from_cli = mod.account
+
+    def account():
+        """`claude auth status`, or the account Claude Code keeps in
+        ~/.claude.json when there is no usable `claude` command (people who
+        only use the Code tab of the Claude desktop app)."""
+        data = from_cli() or {}
+        if data.get("email"):
+            return data
+        return saved_account() or data
+
+    mod.account = account
     return mod
+
+
+PLAN_NAMES = {"claude_pro": "pro", "claude_max": "max", "claude_team": "team",
+              "claude_enterprise": "enterprise", "claude_free": "free"}
+
+
+def saved_account():
+    """Plan and account from Claude Code's own ~/.claude.json (no network)."""
+    path = os.path.join(os.path.expanduser("~"), ".claude.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            oa = json.load(f).get("oauthAccount") or {}
+    except (OSError, ValueError, AttributeError):
+        return None
+    if not oa.get("emailAddress"):
+        return None
+    org_type = oa.get("organizationType") or ""
+    return {
+        "loggedIn": True,
+        "authMethod": "claude.ai",
+        "email": oa.get("emailAddress"),
+        "orgName": oa.get("organizationName"),
+        "subscriptionType": PLAN_NAMES.get(org_type, org_type.replace("claude_", "") or None),
+    }
+
+
+def claude_command():
+    """The `claude` command: on PATH, or the copy the Claude desktop app
+    keeps for its Code tab (%LOCALAPPDATA%\\Claude-Data\\...\\claude-code)."""
+    found = shutil.which("claude")
+    if found or not IS_WINDOWS:
+        return found
+    base = os.environ.get("LOCALAPPDATA") or ""
+    copies = glob.glob(os.path.join(base, "Claude-Data", "*", "claude-code", "*", "*", "claude.exe"))
+    return max(copies, key=os.path.getmtime) if copies else None
 
 
 class _Subprocess:
     """subprocess for claudito-usage: finds claude.exe / claude.cmd on PATH
-    and never flashes a console window from the tray app."""
+    (or the desktop app's copy) and never flashes a console window from the
+    tray app."""
 
     def __getattr__(self, name):
         return getattr(subprocess, name)
 
     def run(self, args, **kw):
         args = list(args)
-        args[0] = shutil.which(args[0]) or args[0]
+        if args[0] == "claude":
+            args[0] = claude_command() or "claude"
+        else:
+            args[0] = shutil.which(args[0]) or args[0]
         if IS_WINDOWS:
             kw.setdefault("creationflags", CREATE_NO_WINDOW)
         return subprocess.run(args, **kw)
