@@ -1,10 +1,11 @@
-# Claudito: Claude Code como compañero de escritorio para KDE Plasma 6
+# Claudito: Claude Code como compañero de escritorio para Windows 11
 
-Un muñequito en pixel art en tu escritorio de KDE Plasma que muestra lo que está
+Un muñequito en pixel art en tu escritorio de Windows que muestra lo que está
 haciendo [Claude Code](https://claude.com/claude-code), con un sombrero o casco
 distinto para cada tipo de trabajo.
 
-*[Read in English](README.md)*
+*[Read in English](README.md)* · ¿Usas KDE Plasma? Los widgets de Plasma están
+en la rama [`main`](https://github.com/coricogit/claudito/tree/main).
 
 | Claude Code está… | Sombrero | Animación |
 |---|---|---|
@@ -21,65 +22,116 @@ distinto para cada tipo de trabajo.
 | Terminó | Gorro de fiesta | Salta entre confeti |
 | 10 minutos sin actividad | Gorro de dormir | Zzz |
 
-Cuando está tranquilo se toma un café. Si le haces clic, da un saltito. Debajo,
-un rótulo dice qué está haciendo y en qué proyecto.
-
-## Widget de uso para el panel
-
-**Claudito Usage** va en la barra de tareas: un mini Claudito y cuánto llevas
-gastado de la ventana de 5 horas. Su cara cambia según te acercas al límite:
-contento, concentrado o sudando. Al hacer clic muestra:
-
-- tu plan y tu cuenta (el email queda oculto hasta que haces clic) y hasta
-  cuándo dura la sesión iniciada
-- los límites del plan: ventana de 5 horas y semanal, con cuándo se reinicia cada una
-- la sesión actual de Claude Code: nombre, modelo, proyecto, contexto usado,
-  tiempo, líneas cambiadas y coste equivalente en API (no te lo cobran con el plan)
-- tokens escritos y leídos, respuestas y sesiones de hoy, 7 y 30 días
-- una gráfica de los últimos 14 días y los proyectos y modelos que más usas
-
-Los límites del plan y la sesión en vivo salen de la *status line* de Claude
-Code, así que se actualizan mientras Claude Code está abierto. El instalador
-configura `claudito-statusline` como status line, salvo que ya tengas otra. El
-historial sale de tus transcripciones locales en `~/.claude/projects` y la
-cuenta, de `claude auth status`. No se envía nada a ningún sitio.
-
-## Cómo funciona
-
-`claudito-hook` se ejecuta como [hook de Claude Code](https://docs.claude.com/en/docs/claude-code/hooks)
-asíncrono en los eventos de sesión, mensaje, herramientas, notificaciones y fin.
-Guarda la actividad de cada sesión en `$XDG_RUNTIME_DIR/claudito/state.json`
-(una carpeta en RAM que solo puede leer tu usuario) y el widget lee ese archivo.
-Si tienes varias sesiones abiertas, sigue la más reciente.
-
-El rótulo muestra nombres de archivo, patrones de búsqueda, dominios web y la
-descripción de los comandos de terminal, nunca el contenido de los archivos.
+Claudito vive en una ventana transparente y sin bordes que se queda por encima
+de las demás. Debajo, un rótulo dice qué está haciendo y en qué proyecto.
 
 ## Instalación
 
-Necesitas KDE Plasma 6, Python 3 y `jq`.
+Necesitas [Python 3.9+](https://www.python.org/downloads/windows/) (marca
+**Add python.exe to PATH**) y que Claude Code se ejecute en este ordenador: el
+comando `claude` en una terminal o una sesión **Local** en la pestaña Code de
+la aplicación de escritorio de Claude. Las sesiones en la nube no ejecutan tus
+hooks locales, así que Claudito no se entera de ellas.
 
-```bash
-git clone https://github.com/coricogit/claudito.git ~/src/claudito
-~/src/claudito/install.sh
+```powershell
+git clone -b windows https://github.com/coricogit/claudito.git $HOME\src\claudito
+py $HOME\src\claudito\windows\install.py
 ```
 
-El instalador enlaza `claudito-hook`, `claudito-statusline` y `claudito-usage`
-en `~/.local/bin`, añade los hooks y la status line a `~/.claude/settings.json`
-(respeta el resto de tus ajustes y hooks, no toca una status line que ya
-tengas y guarda una copia en `settings.json.claudito-backup`) e instala los dos
-widgets. Después, clic derecho > *Añadir widgets*: **Claudito** en el
-escritorio (también cabe en un panel) y **Claudito Usage** en la barra de tareas.
+También puedes hacer doble clic en `windows\instalar.bat`, que hace lo mismo y
+guarda el resultado en `windows\install.log`.
 
-Las sesiones nuevas de Claude Code usan los hooks automáticamente. En una sesión
-que ya estaba abierta, ejecuta `/hooks` una vez.
+El instalador:
 
-Para actualizar: `git pull && ./install.sh`. Para quitarlo todo:
-`./install.sh --uninstall`.
+- instala PySide6 para ese Python si falta
+- añade `windows\claudito_hook.py` como hook asíncrono de Claude Code y
+  `windows\claudito_statusline.py` como línea de estado en
+  `%USERPROFILE%\.claude\settings.json` (respeta el resto de tus ajustes y
+  hooks, no toca una línea de estado que ya tengas y guarda una copia en
+  `settings.json.claudito-backup`)
+- hace que Claudito arranque al iniciar sesión (`--no-autostart` para evitarlo)
+- lo abre (`--no-start` para no abrirlo)
 
-## Windows 11
+Las sesiones nuevas de Claude Code cogen los hooks solas. En una sesión de
+terminal que ya estaba abierta, ejecuta `/hooks` una vez; en la aplicación de
+escritorio, abre una sesión nueva.
 
-Hay una versión para Windows en [`windows/`](windows/README.es.md): el mismo
-muñeco en una ventana transparente y el panel de uso tras un icono en la
-bandeja, hecha con PySide6 sobre el mismo `Character.qml` y los mismos scripts.
-Se instala con `py windows\install.py`.
+Para actualizar: `git pull` y vuelve a ejecutar `install.py` (las rutas de los
+hooks quedan guardadas en `settings.json`, así que no muevas la carpeta o
+reinstala si la mueves). Para quitarlo todo:
+`py windows\install.py --uninstall`.
+
+## Uso
+
+**El muñeco** empieza en la esquina inferior derecha de tu pantalla principal.
+
+- arrástralo a donde quieras: recuerda dónde lo dejaste, también al reiniciar
+- haz clic y da un saltito
+- clic derecho para el menú
+
+**El icono de la bandeja** es un mini Claudito cuya cara sigue tu ventana de 5
+horas: contento, concentrado o sudando. Le sale un **!** naranja cuando Claude
+Code te está esperando. Pasa el ratón por encima para ver qué hace Claude y
+tus límites.
+
+- **clic**: el panel de uso
+- **clic central**: mostrar u ocultar el muñeco
+- **clic derecho**: mostrar el muñeco, uso, tamaño (pequeño / mediano /
+  grande), siempre encima, iniciar con Windows, salir
+
+Si no ves el icono, está bajo la flecha **^** de la barra de tareas.
+Arrástralo a la barra o actívalo en *Configuración > Personalización > Barra
+de tareas > Otros iconos de la bandeja del sistema*.
+
+`windows\reiniciar.bat` cierra Claudito y lo vuelve a abrir.
+
+## Panel de uso
+
+Haz clic en el icono de la bandeja para ver:
+
+- tu plan y tu cuenta (el correo, oculto hasta que haces clic) y hasta cuándo
+  tienes la sesión iniciada
+- los límites del plan: ventana de 5 horas y semana, con cuándo se reinicia
+  cada uno
+- la sesión actual de Claude Code: nombre, modelo, proyecto, contexto usado,
+  tiempo, líneas cambiadas y coste equivalente en la API
+- tokens escritos y leídos, respuestas y sesiones de hoy, 7 y 30 días
+- una gráfica de 14 días y los proyectos y modelos que más usas
+
+Se cierra al hacer clic fuera. Los límites del plan y la sesión actual salen
+de la línea de estado de Claude Code, así que se actualizan mientras Claude
+Code está abierto; el historial sale de los archivos de sesión del propio
+Claude Code. No se envía nada a ningún sitio.
+
+## Cómo funciona
+
+La versión de Windows comparte el código con la de KDE Plasma en lugar de
+copiarlo:
+
+| Pieza | Archivo de Windows | Código compartido que usa |
+|---|---|---|
+| Hook | `windows\claudito_hook.py` | `claudito-hook` |
+| Línea de estado | `windows\claudito_statusline.py` | `claudito-statusline` |
+| Datos de uso | dentro de la aplicación, en un hilo | `claudito-usage` |
+| Ventana del muñeco | `windows\qml\Buddy.qml` | `plasma/.../Character.qml`, `hats.js`, `sprites.js`, `strings.js` |
+| Panel de uso | `windows\qml\UsagePanel.qml` | `plasma/.../MiniClaudito.qml`, `strings.js` de uso |
+| Aplicación y bandeja | `windows\claudito.pyw` | — |
+
+`windows\compat.py` apunta `$XDG_RUNTIME_DIR` y `$XDG_CACHE_HOME` de los
+scripts a `%LOCALAPPDATA%`, así que todo queda en `%LOCALAPPDATA%\claudito`
+(`state.json`, `statusline.json` y cachés). Además sustituye `fcntl` por
+bloqueos de `msvcrt`, reintenta `os.replace` mientras la aplicación lee el
+archivo, encuentra `claude.exe`/`claude.cmd` para `claude auth status` sin
+abrir una consola y entiende rutas `C:\` al nombrar proyectos.
+
+En Windows, Qt Quick dibuja con su renderizador por software: así la ventana
+transparente funciona con cualquier tarjeta gráfica, y un sprite de 60 × 50
+píxeles no cuesta nada. Con `CLAUDITO_GRAPHICS=d3d11` u `opengl` puedes probar
+el renderizado por hardware.
+
+Para abrirlo a mano: doble clic en `windows\claudito.pyw`, o
+`pyw windows\claudito.pyw`. Ábrelo con `py` para ver los errores de QML en la
+consola. Solo se ejecuta una copia a la vez.
+
+El rótulo muestra nombres de archivo, patrones de búsqueda, dominios web y la
+descripción de los comandos de terminal, nunca el contenido de los archivos.
