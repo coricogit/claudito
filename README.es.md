@@ -4,7 +4,8 @@ Un muñequito en pixel art en tu escritorio de KDE Plasma que muestra lo que est
 haciendo [Claude Code](https://claude.com/claude-code), con un sombrero o casco
 distinto para cada tipo de trabajo.
 
-*[Read in English](README.md)*
+*[Read in English](README.md)* · ¿Usas Windows 11? La versión para Windows está
+en la rama [`windows`](https://github.com/coricogit/claudito/tree/windows).
 
 | Claude Code está… | Sombrero | Animación |
 |---|---|---|

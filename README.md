@@ -4,7 +4,8 @@ A little character on your KDE Plasma desktop that shows what
 [Claude Code](https://claude.com/claude-code) is doing, with a different hat
 or helmet for each kind of work.
 
-*[Leer en español](README.es.md)*
+*[Leer en español](README.es.md)* · On Windows 11? The Windows version is on
+the [`windows`](https://github.com/coricogit/claudito/tree/windows) branch.
 
 | Claude Code is… | Hat | Animation |
 |---|---|---|
