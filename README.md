@@ -27,11 +27,21 @@ windows. Under it, a caption says what it's doing and in which project.
 
 ## Install
 
+Download **Claudito-Setup** from the
+[latest release](https://github.com/coricogit/claudito/releases/latest) and run
+it. It doesn't need Python or administrator rights, connects Claudito to Claude
+Code and can be removed from *Settings > Apps*. It isn't signed, so Windows may
+show a blue "Windows protected your PC" notice: *More info > Run anyway*. To
+update, run the installer of the new version.
+
+You need Claude Code running on this computer: the `claude` command in a
+terminal, or a **Local** session in the Code tab of the Claude desktop app.
+Cloud sessions don't run your local hooks, so Claudito can't see them.
+
+### From the source code
+
 Needs [Python 3.9+](https://www.python.org/downloads/windows/) (tick **Add
-python.exe to PATH**) and Claude Code running on this computer: the `claude`
-command in a terminal, or a **Local** session in the Code tab of the Claude
-desktop app. Cloud sessions don't run your local hooks, so Claudito can't see
-them.
+python.exe to PATH**).
 
 ```powershell
 git clone https://github.com/coricogit/claudito.git $HOME\src\claudito
@@ -172,3 +182,11 @@ Tests: `py -m unittest discover -s windows/tests`.
 
 The caption shows file names, search patterns, web domains and the
 descriptions of terminal commands, never file contents.
+
+## License
+
+[MIT](LICENSE). The installer also carries Python and Qt, under their own
+licenses: [THIRD-PARTY.txt](installer/licenses/THIRD-PARTY.txt). Build it with
+`py installer\build.py`.
+
+Claudito is an unofficial project, not made or endorsed by Anthropic.

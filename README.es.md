@@ -27,11 +27,23 @@ de las demás. Debajo, un rótulo dice qué está haciendo y en qué proyecto.
 
 ## Instalación
 
+Descarga **Claudito-Setup** de la
+[última versión](https://github.com/coricogit/claudito/releases/latest) y
+ejecútalo. No necesita Python ni permisos de administrador, conecta Claudito
+con Claude Code y se quita desde *Configuración > Aplicaciones*. No está
+firmado, así que Windows puede mostrar el aviso azul «Windows protegió su PC»:
+*Más información > Ejecutar de todas formas*. Para actualizar, ejecuta el
+instalador de la versión nueva.
+
+Hace falta que Claude Code se ejecute en este ordenador: el comando `claude` en
+una terminal o una sesión **Local** en la pestaña Code de la aplicación de
+escritorio de Claude. Las sesiones en la nube no ejecutan tus hooks locales,
+así que Claudito no se entera de ellas.
+
+### Desde el código fuente
+
 Necesitas [Python 3.9+](https://www.python.org/downloads/windows/) (marca
-**Add python.exe to PATH**) y que Claude Code se ejecute en este ordenador: el
-comando `claude` en una terminal o una sesión **Local** en la pestaña Code de
-la aplicación de escritorio de Claude. Las sesiones en la nube no ejecutan tus
-hooks locales, así que Claudito no se entera de ellas.
+**Add python.exe to PATH**).
 
 ```powershell
 git clone https://github.com/coricogit/claudito.git $HOME\src\claudito
@@ -175,3 +187,11 @@ Pruebas: `py -m unittest discover -s windows/tests`.
 
 El rótulo muestra nombres de archivo, patrones de búsqueda, dominios web y la
 descripción de los comandos de terminal, nunca el contenido de los archivos.
+
+## Licencia
+
+[MIT](LICENSE). El instalador lleva además Python y Qt, con sus propias
+licencias: [THIRD-PARTY.txt](installer/licenses/THIRD-PARTY.txt). Se construye
+con `py installer\build.py`.
+
+Claudito es un proyecto no oficial; Anthropic no lo hace ni lo respalda.

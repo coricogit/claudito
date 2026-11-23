@@ -1,0 +1,20 @@
+Claudito itself is under the MIT license (see LICENSE).
+Its Windows installer also carries these, unmodified:
+
+Python 3.12.10 (folder "python")
+  Copyright (c) 2001 Python Software Foundation. PSF license: python\LICENSE.txt
+  https://www.python.org/downloads/release/python-31210/
+
+Qt 6.12.0, PySide6 6.12.0 and Shiboken6 6.12.0 (folder "python\Lib\site-packages")
+  Copyright (C) The Qt Company Ltd. and other contributors.
+  Used under the GNU Lesser General Public License, version 3: see LGPL-3.0.txt
+  and GPL-3.0.txt. They are separate DLLs, taken from the official PySide6
+  packages on PyPI, with the parts Claudito doesn't use left out. You may
+  replace them with your own compatible build.
+  Source code: https://download.qt.io/official_releases/qt/6.12/6.12.0/
+               https://download.qt.io/official_releases/QtForPython/
+  Third-party code inside Qt: https://doc.qt.io/qt-6/licenses-used-in-qt.html
+
+Microsoft Visual C++ runtime (msvcp140*.dll, vcruntime140*.dll)
+  Copyright (c) Microsoft Corporation. Redistributed as it comes with Python
+  and PySide6.

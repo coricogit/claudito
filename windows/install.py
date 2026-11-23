@@ -3,6 +3,9 @@
     py windows\\install.py              install (or update) and start Claudito
     py windows\\install.py --uninstall  remove the hooks, status line and autostart
 
+The .exe installer (installer/claudito.iss) runs this too, with the Python it
+carries.
+
 What it does:
   - installs PySide6 for this Python if it is missing
   - adds windows\\claudito_hook.py as an async Claude Code hook and
@@ -18,6 +21,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP = os.path.join(HERE, "claudito.pyw")
@@ -69,10 +73,12 @@ def command(script):
 
 def load_settings(path):
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8-sig") as f:   # some editors leave a BOM
             data = json.load(f)
     except FileNotFoundError:
         return {}
+    except ValueError as e:
+        raise SystemExit(f"{path} is not valid JSON ({e}); not touching it.")
     if not isinstance(data, dict):
         raise SystemExit(f"{path} is not a JSON object; not touching it.")
     return data
@@ -198,19 +204,58 @@ def start_app():
     subprocess.Popen([gui_python(), APP], cwd=HERE, creationflags=flags, close_fds=True)
 
 
+def stop_app():
+    """Closes every copy of Claudito that is open."""
+    if os.name != "nt":
+        return
+    script = ("Get-CimInstance Win32_Process -Filter \"Name like 'python%'\" | "
+              "Where-Object { $_.CommandLine -like '*claudito.pyw*' } | "
+              "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }")
+    subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                   creationflags=subprocess.CREATE_NO_WINDOW, stdin=subprocess.DEVNULL,
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(0.5)   # Windows takes a moment to let go of its files
+
+
+def purge():
+    """Claudito's own files and settings; nothing of Claude Code's."""
+    if os.name != "nt":
+        return
+    import winreg
+    base = os.environ.get("LOCALAPPDATA")
+    if base:
+        shutil.rmtree(os.path.join(base, "claudito"), ignore_errors=True)
+    try:
+        winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r"Software\corico\Claudito")
+    except OSError:
+        pass
+
+
 def main():
     ap = argparse.ArgumentParser(description="Install Claudito for Windows.")
     ap.add_argument("--uninstall", action="store_true", help="remove hooks, status line and autostart")
     ap.add_argument("--no-autostart", action="store_true", help="don't start Claudito when you log in")
     ap.add_argument("--no-start", action="store_true", help="don't start Claudito now")
+    ap.add_argument("--stop", action="store_true", help="close Claudito first; alone, do nothing else")
+    ap.add_argument("--purge", action="store_true", help="with --uninstall, also delete Claudito's data and settings")
+    ap.add_argument("--log", metavar="FILE", help="write the output to a file")
     args = ap.parse_args()
+    if args.log:
+        sys.stdout = sys.stderr = open(args.log, "w", encoding="utf-8", buffering=1)
     path = settings_path()
+
+    if args.stop:
+        stop_app()
+        if not (args.uninstall or args.log or args.no_start or args.no_autostart):
+            return
 
     if args.uninstall:
         step(f"Removing the Claude Code hooks ({path})")
         uninstall_settings(path)
         step("Removing autostart")
         set_autostart(False)
+        if args.purge:
+            purge()
         print("Done. Quit Claudito from its tray icon if it is running.")
         print(f"A backup of your settings is in {path}.claudito-backup")
         return
