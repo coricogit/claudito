@@ -29,6 +29,7 @@ Item {
   Component.onCompleted: shownHat = hat
   onHatChanged: if (hat !== shownHat) hatSwap.restart()
   onModeChanged: canvas.requestPaint()
+  onBlinkingChanged: if (mode === "idle") canvas.requestPaint()
 
   SequentialAnimation {
     id: hatSwap
@@ -37,11 +38,15 @@ Item {
     NumberAnimation { target: root; property: "hatDrop"; from: -22; to: 0; duration: 500; easing.type: Easing.OutBounce }
   }
 
+  // Frames are always 100 ms of animation; while nothing much moves several
+  // go by at once, to draw less often.
+  readonly property int frameStep: hatSwap.running ? 1 : mode === "sleep" ? 5 : mode === "idle" ? 2 : 1
+
   Timer {
-    interval: 100
+    interval: 100 * root.frameStep
     repeat: true
     running: root.visible && root.width > 0
-    onTriggered: { root.frame++; canvas.requestPaint() }
+    onTriggered: { root.frame += root.frameStep; canvas.requestPaint() }
   }
 
   Timer {

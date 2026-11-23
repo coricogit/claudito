@@ -76,7 +76,17 @@ see what Claude is doing and how many tokens it has written today.
 - **click**: the usage panel
 - **middle-click**: show or hide the buddy
 - **right-click**: show the buddy, usage, size (small / medium / large),
-  always on top, start with Windows, quit
+  always on top, notifications, hide behind full-screen apps, start with
+  Windows, quit
+
+**Several sessions**: one that needs you always shows first, then the ones
+working, then the idle ones.
+
+**Notifications**: Windows tells you when Claude has been waiting for you for
+more than 5 seconds and when a task of a minute or more ends.
+
+**Full screen**: the buddy hides while a game, video or presentation covers
+its screen.
 
 If the icon isn't visible, it's under the **^** arrow in the taskbar. Drag it
 onto the taskbar, or turn it on in *Settings > Personalization > Taskbar >
@@ -112,6 +122,8 @@ it:
 | Usage data | in-process, in a thread | `claudito-usage` |
 | Buddy window | `windows\qml\Buddy.qml` | `plasma/.../Character.qml`, `hats.js`, `sprites.js`, `strings.js` |
 | Usage panel | `windows\qml\UsagePanel.qml` | `plasma/.../MiniClaudito.qml`, usage `strings.js` |
+| What to show, notifications | `windows\activity.py` | — |
+| Full-screen detection | `windows\fullscreen.py` | — |
 | App and tray | `windows\claudito.pyw` | — |
 
 `windows\compat.py` points the scripts' `$XDG_RUNTIME_DIR` and
@@ -129,6 +141,13 @@ nothing. Set `CLAUDITO_GRAPHICS=d3d11` or `opengl` to try hardware rendering.
 To run it by hand: double-click `windows\claudito.pyw`, or
 `pyw windows\claudito.pyw`. Run it with `py` instead to see QML errors in the
 console. Only one copy runs at a time.
+
+No hook fires when you answer a permission prompt, press Esc or close the
+terminal, so `activity.py` also looks at the status Claude Code keeps in
+`~/.claude\sessions`. That folder is internal to Claude Code: if it changes,
+Claudito goes back to relying on the hooks alone.
+
+Tests: `py -m unittest discover -s windows/tests`.
 
 The caption shows file names, search patterns, web domains and the
 descriptions of terminal commands, never file contents.

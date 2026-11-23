@@ -5,7 +5,8 @@ Claude usage panel behind a tray icon.
 
 The buddy is the same Character.qml as the KDE Plasma widget, loaded straight
 from ../plasma. Claude Code drives it through windows/claudito_hook.py, which
-writes %LOCALAPPDATA%\\claudito\\state.json; this app polls that file.
+writes %LOCALAPPDATA%\\claudito\\state.json; this app polls that file and
+windows/activity.py decides what to show.
 """
 import json
 import os
@@ -16,7 +17,9 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
+import activity  # noqa: E402
 import compat  # noqa: E402
+import fullscreen  # noqa: E402
 
 compat.setup_env()
 
@@ -40,6 +43,12 @@ TEXT = {
         "size": "Size",
         "small": "Small", "medium": "Medium", "large": "Large",
         "onTop": "Always on top",
+        "hideFull": "Hide behind full-screen apps",
+        "notify": "Notifications",
+        "notifyWaiting": "When Claude needs you",
+        "notifyDone": "When a long task ends",
+        "toastWaiting": "Claude needs you", "toastWaitingText": "It is waiting for your answer.",
+        "toastDone": "Claude has finished", "toastDoneText": "It took {time}.",
         "autostart": "Start with Windows",
         "quit": "Quit",
         "tipToday": "Today: {out} tokens written",
@@ -51,6 +60,12 @@ TEXT = {
         "size": "Tamaño",
         "small": "Pequeño", "medium": "Mediano", "large": "Grande",
         "onTop": "Siempre encima",
+        "hideFull": "Ocultar con apps a pantalla completa",
+        "notify": "Avisos",
+        "notifyWaiting": "Cuando Claude te necesite",
+        "notifyDone": "Al terminar una tarea larga",
+        "toastWaiting": "Claude te necesita", "toastWaitingText": "Está esperando tu respuesta.",
+        "toastDone": "Claude ha terminado", "toastDoneText": "Ha tardado {time}.",
         "autostart": "Iniciar con Windows",
         "quit": "Salir",
         "tipToday": "Hoy: {out} tokens escritos",
@@ -62,6 +77,12 @@ LANG = "es" if QLocale.system().name().startswith("es") else "en"
 
 def tr(key):
     return TEXT[LANG].get(key) or TEXT["en"][key]
+
+
+def duration(seconds):
+    m, s = divmod(int(seconds), 60)
+    h, m = divmod(m, 60)
+    return f"{h} h {m} min" if h else f"{m} min {s} s" if m else f"{s} s"
 
 
 def log_error(what):
@@ -85,7 +106,8 @@ def log_error(what):
 # ---------------------------------------------------------------------------
 
 class Backend(QObject):
-    stateChanged = Signal()
+    viewChanged = Signal()
+    notify = Signal(str, object, float)   # "waiting" or "done", the session's view, seconds
     usageChanged = Signal()
     settingsChanged = Signal()
     activityChanged = Signal()
@@ -94,13 +116,16 @@ class Backend(QObject):
     def __init__(self, settings):
         super().__init__()
         self.settings = settings
-        self._state = ""
+        self._view = json.dumps(activity.ASLEEP)
+        self._tracker = activity.Tracker()
+        self._notifier = activity.Notifier(time.time())
         self._usage = ""
         self._usage_data = {}
         self._activity = ""
         self._mode = "sleep"
         self._worker = None
         self._fast = False
+        self._poll_failed = False
 
         self._usageReady.connect(self._set_usage)
 
@@ -112,21 +137,35 @@ class Backend(QObject):
         self._usage_timer.start()
         QTimer.singleShot(0, self.refreshUsage)
 
-    # ----- state.json (written by the hook) -----
+    # ----- what Claude is doing (state.json, written by the hook) -----
     def _poll_state(self):
         try:
             with open(compat.state_file(), encoding="utf-8") as f:
                 text = f.read()
-        except OSError:
+        except FileNotFoundError:
             text = ""
-        if text != self._state:
-            self._state = text
-            self.stateChanged.emit()
+        except OSError:   # the hook is replacing it: try again on the next poll
+            return
+        now = time.time()
+        try:
+            view, views = self._tracker.update(text, activity.read_registry(), now)
+            told = self._notifier.update(views, now) if views is not None else []
+        except Exception:   # a surprise in those files must not stop the polling
+            if not self._poll_failed:
+                self._poll_failed = True
+                log_error("state failed")
+            return
+        text = json.dumps(view)
+        if text != self._view:
+            self._view = text
+            self.viewChanged.emit()
+        for kind, v, seconds in told:
+            self.notify.emit(kind, v, seconds)
 
-    def _get_state(self):
-        return self._state
+    def _get_view(self):
+        return self._view
 
-    stateText = Property(str, _get_state, notify=stateChanged)
+    viewText = Property(str, _get_view, notify=viewChanged)
 
     # ----- usage (claudito-usage, run in a thread) -----
     @Slot()
@@ -280,10 +319,15 @@ class Claudito(QObject):
         self._place_buddy()
         self.buddy.xChanged.connect(lambda _: self._save_pos.start())
         self.buddy.yChanged.connect(lambda _: self._save_pos.start())
-        self.buddy.setVisible(self.settings.value("visible", True, type=bool))
+        self._covered = False   # a full-screen app is on its screen
+        self._fullscreen = fullscreen.Detector()
+        self._apply_visible()
+        self._full_timer = QTimer(self, interval=1000, timeout=self._check_fullscreen)
+        self._full_timer.start()
 
         self._build_tray()
         self.backend.menuRequested.connect(lambda: self.menu.popup(QCursor.pos()))
+        self.backend.notify.connect(self._notify)
         self.backend.usageChanged.connect(self._update_tray)
         self.backend.activityChanged.connect(self._update_tray)
         self._update_tray()
@@ -311,10 +355,27 @@ class Claudito(QObject):
         self.settings.setValue("x", self.buddy.x())
         self.settings.setValue("y", self.buddy.y())
 
+    def _flag(self, key):
+        return self.settings.value(key, True, type=bool)
+
+    def _apply_visible(self):
+        self.buddy.setVisible(self._flag("visible") and not self._covered)
+
     def set_buddy_visible(self, on):
-        self.buddy.setVisible(on)
         self.settings.setValue("visible", on)
+        self._apply_visible()
         self.show_action.setChecked(on)
+
+    def _check_fullscreen(self):
+        covered = (self._flag("hideFull") and self._flag("visible")
+                   and self._fullscreen.covered(int(self.buddy.winId())))
+        if covered != self._covered:
+            self._covered = covered
+            self._apply_visible()
+
+    def set_hide_full(self, on):
+        self.settings.setValue("hideFull", on)
+        self._check_fullscreen()
 
     def set_size(self, key):
         self.settings.setValue("size", key)
@@ -364,7 +425,7 @@ class Claudito(QObject):
         menu = self.menu = QMenu()
 
         self.show_action = QAction(tr("show"), menu, checkable=True)
-        self.show_action.setChecked(self.buddy.isVisible())
+        self.show_action.setChecked(self._flag("visible"))
         self.show_action.toggled.connect(self.set_buddy_visible)
         menu.addAction(self.show_action)
 
@@ -388,7 +449,19 @@ class Claudito(QObject):
         on_top.toggled.connect(self.set_on_top)
         menu.addAction(on_top)
 
+        notify_menu = menu.addMenu(tr("notify"))
+        for key in ("notifyWaiting", "notifyDone"):
+            a = QAction(tr(key), notify_menu, checkable=True)
+            a.setChecked(self._flag(key))
+            a.toggled.connect(lambda on, k=key: self.settings.setValue(k, on))
+            notify_menu.addAction(a)
+
         if compat.IS_WINDOWS:
+            hide_full = QAction(tr("hideFull"), menu, checkable=True)
+            hide_full.setChecked(self._flag("hideFull"))
+            hide_full.toggled.connect(self.set_hide_full)
+            menu.addAction(hide_full)
+
             auto = QAction(tr("autostart"), menu, checkable=True)
             auto.setChecked(install.autostart_enabled())
             auto.toggled.connect(lambda on: install.set_autostart(on))
@@ -408,7 +481,22 @@ class Claudito(QObject):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.toggle_panel()
         elif reason == QSystemTrayIcon.ActivationReason.MiddleClick:
-            self.set_buddy_visible(not self.buddy.isVisible())
+            self.set_buddy_visible(not self._flag("visible"))
+
+    def _notify(self, kind, view, seconds):
+        if not self._flag("notifyWaiting" if kind == "waiting" else "notifyDone"):
+            return
+        if kind == "waiting":
+            title = tr("toastWaiting")
+            # A permission request says which tool; a question, only that it waits.
+            what = ": ".join(t for t in (view["tool"], view["detail"]) if t)
+            text = what if view["detail"] else tr("toastWaitingText")
+        else:
+            title, text = tr("toastDone"), tr("toastDoneText").format(time=duration(seconds))
+        if view["project"]:
+            title += " · " + view["project"]
+        mood = "worried" if kind == "waiting" else "happy"
+        self.tray.showMessage(title, text, QIcon(tray_pixmap(mood, waiting=kind == "waiting", size=64)), 8000)
 
     def _update_tray(self):
         mode = self.backend.mode

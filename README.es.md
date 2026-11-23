@@ -78,7 +78,17 @@ ha escrito hoy.
 - **clic**: el panel de uso
 - **clic central**: mostrar u ocultar el muñeco
 - **clic derecho**: mostrar el muñeco, uso, tamaño (pequeño / mediano /
-  grande), siempre encima, iniciar con Windows, salir
+  grande), siempre encima, avisos, ocultar con apps a pantalla completa,
+  iniciar con Windows, salir
+
+**Varias sesiones**: primero se muestra la que te necesita, después las que
+trabajan y al final las inactivas.
+
+**Avisos**: Windows te avisa cuando Claude lleva más de 5 segundos
+esperándote y cuando termina una tarea de un minuto o más.
+
+**Pantalla completa**: el muñeco se oculta mientras un juego, un vídeo o una
+presentación ocupa su pantalla.
 
 Si no ves el icono, está bajo la flecha **^** de la barra de tareas.
 Arrástralo a la barra o actívalo en *Configuración > Personalización > Barra
@@ -114,6 +124,8 @@ copiarlo:
 | Datos de uso | dentro de la aplicación, en un hilo | `claudito-usage` |
 | Ventana del muñeco | `windows\qml\Buddy.qml` | `plasma/.../Character.qml`, `hats.js`, `sprites.js`, `strings.js` |
 | Panel de uso | `windows\qml\UsagePanel.qml` | `plasma/.../MiniClaudito.qml`, `strings.js` de uso |
+| Qué mostrar y avisos | `windows\activity.py` | — |
+| Detección de pantalla completa | `windows\fullscreen.py` | — |
 | Aplicación y bandeja | `windows\claudito.pyw` | — |
 
 `windows\compat.py` apunta `$XDG_RUNTIME_DIR` y `$XDG_CACHE_HOME` de los
@@ -131,6 +143,13 @@ el renderizado por hardware.
 Para abrirlo a mano: doble clic en `windows\claudito.pyw`, o
 `pyw windows\claudito.pyw`. Ábrelo con `py` para ver los errores de QML en la
 consola. Solo se ejecuta una copia a la vez.
+
+Ningún hook avisa cuando respondes a un permiso, pulsas Esc o cierras la
+terminal, así que `activity.py` también mira el estado que Claude Code guarda
+en `~/.claude\sessions`. Esa carpeta es interna de Claude Code: si cambia,
+Claudito vuelve a usar solo los hooks.
+
+Pruebas: `py -m unittest discover -s windows/tests`.
 
 El rótulo muestra nombres de archivo, patrones de búsqueda, dominios web y la
 descripción de los comandos de terminal, nunca el contenido de los archivos.

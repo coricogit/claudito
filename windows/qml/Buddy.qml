@@ -8,7 +8,7 @@ import "../../plasma/org.corico.claudito/contents/code/hats.js" as Hats
 
 // Claudito on the Windows desktop: a frameless, transparent window that only
 // shows the buddy and its caption. Drag it anywhere, click to poke it,
-// right-click for the menu. The state logic mirrors plasma/.../main.qml.
+// right-click for the menu.
 Window {
   id: win
 
@@ -25,21 +25,12 @@ Window {
   flags: Qt.FramelessWindowHint | Qt.Tool | Qt.NoDropShadowWindowHint
          | (backend.onTop ? Qt.WindowStaysOnTopHint : 0)
 
-  // Raw state from the hook.
-  property string rawMode: "sleep"
+  // What is shown: windows/activity.py picks the session and its mode.
+  property string mode: "sleep"
+  property string hat: "nightcap"
   property string tool: ""
   property string detail: ""
   property string project: ""
-  property real eventTs: 0
-  property bool haveData: false
-
-  // What is shown.
-  property string mode: "sleep"
-  property string hat: "nightcap"
-  property real now: Date.now() / 1000
-  property real thinkingSince: 0
-
-  readonly property var toolModes: ["build", "terminal", "search", "explore", "lead", "plan", "create", "work"]
 
   readonly property string label: {
     var d = detail
@@ -66,64 +57,20 @@ Window {
   Binding { target: backend; property: "activity"; value: win.label }
   Binding { target: backend; property: "mode"; value: win.mode }
 
-  // ---------- Reading the state file ----------
+  // ---------- What Claude is doing ----------
   Connections {
     target: backend
-    function onStateChanged() { win.readState(backend.stateText) }
+    function onViewChanged() { win.readView() }
   }
-  Component.onCompleted: readState(backend.stateText)
+  Component.onCompleted: readView()
 
-  function readState(text) {
-    if (!text) { haveData = false; return }
-    try {
-      var s = JSON.parse(text)
-      var best = null
-      for (var id in s.sessions) {
-        var v = s.sessions[id]
-        if (!best || v.ts > best.ts) best = v
-      }
-      if (!best) { haveData = false; return }
-      haveData = true
-      if (best.ts !== eventTs) {
-        eventTs = best.ts
-        tool = best.tool || ""
-        detail = best.detail || ""
-        project = best.project || ""
-        rawMode = best.mode || "idle"
-      }
-    } catch (e) {
-      // Half-written file: try again on the next poll.
-    }
-  }
-
-  Timer {
-    interval: 500
-    running: true
-    repeat: true
-    triggeredOnStart: true
-    onTriggered: { win.now = Date.now() / 1000; win.update() }
-  }
-
-  onRawModeChanged: update()
-  onEventTsChanged: update()
-
-  function update() {
-    var age = now - eventTs
-    var next
-    if (!haveData) next = "sleep"
-    else if (rawMode === "done") next = age < 6 ? "done" : age < 600 ? "idle" : "sleep"
-    else if (rawMode === "wake") next = age < 3 ? "wake" : age < 600 ? "idle" : "sleep"
-    else if (rawMode === "oops") next = age < 3 ? "oops" : "thinking"
-    else if (rawMode === "sleep") next = "sleep"
-    else if (rawMode === "waiting") next = "waiting"
-    // A tool that never reported back (Claude Code closed mid-task).
-    else if (age > 900) next = "sleep"
-    else next = rawMode
-
-    // Short "thinking" gaps between tools keep the current hat on.
-    if (next === "thinking" && toolModes.indexOf(mode) >= 0 && age < 1.5) return
-    if (next === mode) return
-    mode = next
+  function readView() {
+    var v = JSON.parse(backend.viewText)
+    tool = v.tool
+    detail = v.detail
+    project = v.project
+    if (v.mode === mode) return
+    mode = v.mode
     if (mode !== "waiting" && mode !== "oops") hat = Hats.hatFor(mode)
   }
 
@@ -134,6 +81,7 @@ Window {
     anchors.top: parent.top
     width: 60 * win.p
     height: 50 * win.p
+    visible: win.visible   // don't animate while hidden
     mode: win.mode
     hat: win.hat
 
