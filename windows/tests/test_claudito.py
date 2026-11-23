@@ -241,6 +241,13 @@ class Tracker(unittest.TestCase):
     def show(self, t, now=NOW, registry=None, **sessions):
         return t.update(json.dumps({"sessions": sessions}), registry, now)[0]
 
+    def test_desktop_session(self):
+        s = {"mode": "waiting", "ts": NOW}
+        live = {"status": "waiting", "since": NOW}
+        self.assertTrue(self.show(activity.Tracker(), registry={"a": {**live, "desktop": True}}, a=s)["desktop"])
+        self.assertFalse(self.show(activity.Tracker(), registry={"a": live}, a=s)["desktop"])
+        self.assertFalse(self.show(activity.Tracker(), a=s)["desktop"])
+
     def test_waiting_beats_newer_work(self):
         v = self.show(activity.Tracker(), a={"mode": "waiting", "ts": NOW - 60, "project": "p"},
                       b={"mode": "build", "ts": NOW})
@@ -289,7 +296,9 @@ class Registry(unittest.TestCase):
             put("4.json", "[]")
             put("5.secret.key", "x")
             got = activity.read_registry(d, alive=lambda pid, started: pid != 2)
-            self.assertEqual(got, {"a": {"status": "busy", "since": 5.0}})
+            self.assertEqual(got, {"a": {"status": "busy", "since": 5.0, "desktop": False}})
+            put("1.json", json.dumps({"sessionId": "a", "entrypoint": "claude-desktop"}))
+            self.assertTrue(activity.read_registry(d, alive=lambda pid, started: pid == 1)["a"]["desktop"])
         self.assertIsNone(activity.read_registry(os.path.join(d, "nope")))
 
     def test_process_alive(self):
@@ -312,6 +321,20 @@ class Notify(unittest.TestCase):
         self.assertEqual(n.update(v, NOW + 5), [])
         self.assertEqual([x[0] for x in n.update(v, NOW + 6)], ["waiting"])
         self.assertEqual(n.update(v, NOW + 60), [])
+
+    def test_desktop_app_permissions(self):
+        """The app has its own notifications for permissions, not for the rest."""
+        for desktop, tool, told in ((True, "PowerShell", False), (True, "AskUserQuestion", True),
+                                    (True, "ExitPlanMode", True), (True, "", True), (False, "PowerShell", True)):
+            n = activity.Notifier(NOW)
+            v = self.view("waiting", NOW + 1)
+            v["s"].update(desktop=desktop, tool=tool)
+            n.update(v, NOW + 1)
+            self.assertEqual(bool(n.update(v, NOW + 9)), told, (desktop, tool))
+        n = activity.Notifier(NOW)
+        v = self.view("done", NOW + 200, NOW + 100)
+        v["s"]["desktop"] = True
+        self.assertEqual(len(n.update(v, NOW + 200)), 1)
 
     def test_answered_at_once(self):
         n = activity.Notifier(NOW)

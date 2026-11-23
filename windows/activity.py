@@ -28,6 +28,11 @@ HAT_GAP_SECONDS = 1.5     # short "thinking" gaps between tools keep the hat on
 RANK = {"waiting": 4, "done": 3, "wake": 1, "idle": 1, "sleep": 0}
 BUSY_RANK = 2
 
+# Sessions of the Claude desktop app, which has its own notifications for
+# permissions. It has none for these tools, which also wait for you.
+DESKTOP = {"claude-desktop", "claude-desktop-3p"}
+QUESTIONS = {"AskUserQuestion", "ExitPlanMode"}
+
 ASLEEP = {"mode": "sleep", "tool": "", "detail": "", "project": "", "ts": 0, "session": "", "turn": 0}
 
 
@@ -41,7 +46,7 @@ def _number(v):
 
 
 def read_registry(folder=None, alive=None):
-    """{session id: {"status", "since"}} of the sessions running now, or None
+    """{session id: {"status", "since", "desktop"}} of the sessions running now, or None
     if this Claude Code doesn't keep them."""
     folder = folder or sessions_dir()
     alive = alive or process_alive
@@ -66,7 +71,8 @@ def read_registry(folder=None, alive=None):
         since = _number(d.get("statusUpdatedAt")) / 1000
         old = out.get(d["sessionId"])
         if not old or since >= old["since"]:
-            out[d["sessionId"]] = {"status": d.get("status"), "since": since}
+            out[d["sessionId"]] = {"status": d.get("status"), "since": since,
+                                   "desktop": d.get("entrypoint") in DESKTOP}
     return out
 
 
@@ -180,6 +186,7 @@ class Tracker:
                 "ts": _number(s.get("ts")),
                 "turn": _number(s.get("turn")),
                 "session": sid,
+                "desktop": bool((live or {}).get("desktop")),
             }
         best = max(views.values(), key=lambda v: (RANK.get(v["mode"], BUSY_RANK), v["ts"]),
                    default=dict(ASLEEP))
@@ -213,7 +220,9 @@ class Notifier:
                     w = self.waiting[sid] = [v["ts"], now, v["ts"] < self.started]
                 if not w[2] and now - w[1] >= self.WAIT_DELAY:
                     w[2] = True
-                    out.append(("waiting", v, now - v["ts"]))
+                    permission = v["tool"] and v["tool"] not in QUESTIONS
+                    if not (permission and v.get("desktop")):   # the app tells you itself
+                        out.append(("waiting", v, now - v["ts"]))
             else:
                 self.waiting.pop(sid, None)
             if v["mode"] == "done" and self.done.get(sid) != v["ts"]:

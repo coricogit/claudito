@@ -100,7 +100,8 @@ trabajan y al final las inactivas.
 
 **Avisos**: Windows te avisa cuando Claude lleva más de 5 segundos
 esperándote y cuando termina una tarea de un minuto o más. El aviso se quita
-solo a los 5 segundos.
+solo a los 5 segundos. De los permisos en la aplicación de escritorio de Claude
+ya avisa la propia aplicación.
 
 **Pantalla completa**: el muñeco se oculta mientras un juego, un vídeo o una
 presentación ocupa su pantalla.

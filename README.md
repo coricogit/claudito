@@ -98,7 +98,8 @@ working, then the idle ones.
 
 **Notifications**: Windows tells you when Claude has been waiting for you for
 more than 5 seconds and when a task of a minute or more ends. The notification
-goes away by itself after 5 seconds.
+goes away by itself after 5 seconds. Permissions in the Claude desktop app are
+left to the app's own notifications.
 
 **Full screen**: the buddy hides while a game, video or presentation covers
 its screen.
