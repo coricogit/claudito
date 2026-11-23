@@ -277,6 +277,8 @@ class Backend(QObject):
 
     seasonHat = Property(str, lambda self: self._clothes[0], notify=clothesChanged)
     seasonOutfit = Property(str, lambda self: self._clothes[1], notify=clothesChanged)
+    # For the face in the usage panel.
+    miniClothes = Property(str, lambda self: json.dumps(clothes_pixels(*self._clothes)), notify=clothesChanged)
 
     # ----- called from QML -----
     menuRequested = Signal()
@@ -289,6 +291,18 @@ class Backend(QObject):
 # ---------------------------------------------------------------------------
 # Tray icon: the panel's MiniClaudito, painted with QPainter
 # ---------------------------------------------------------------------------
+
+def clothes_pixels(hat, outfit):
+    """(x, y, "#rrggbb") of the tiny Claudito's seasonal clothes."""
+    out = []
+    if outfit:
+        for x, y, c in tray_sprites.pixels(tray_sprites.OUTFITS[outfit], tray_sprites.OUTFIT_TOP):
+            # The left column is in shade, like the body's.
+            out.append((x, y, QColor(c).darker(130).name() if x == 1 else c))
+    if hat:
+        out.extend(tray_sprites.pixels(tray_sprites.HATS[hat], tray_sprites.HAT_TOP))
+    return out
+
 
 def tray_pixmap(mood, waiting=False, size=32, hat="", outfit=""):
     """`hat` and `outfit` are seasons, or "" for none."""
@@ -310,13 +324,8 @@ def tray_pixmap(mood, waiting=False, size=32, hat="", outfit=""):
     px(2, 1, 1, 1, top)
     for x in (3, 6, 9, 12):
         px(x, 11, 1, 2, side)
-    if outfit:
-        for x, y, c in tray_sprites.pixels(tray_sprites.OUTFITS[outfit], tray_sprites.OUTFIT_TOP):
-            # The left column is in shade, like the body's.
-            px(x, y, 1, 1, QColor(c).darker(130) if x == 1 else c)
-    if hat:
-        for x, y, c in tray_sprites.pixels(tray_sprites.HATS[hat], tray_sprites.HAT_TOP):
-            px(x, y, 1, 1, c)
+    for x, y, c in clothes_pixels(hat, outfit):
+        px(x, y, 1, 1, c)
     for i, x in enumerate((4, 10)):
         if mood == "sleep":
             px(x, 5, 3, 1, ink)

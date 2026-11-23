@@ -5,7 +5,11 @@ Item {
   id: root
   property string mood: "happy"
   readonly property int gw: 16
-  readonly property int gh: 14
+  // Optional clothes: [[x, y, color], ...] over the body. A hat goes in the
+  // rows above the head (y < 0), which headRoom makes place for.
+  property var clothes: []
+  property int headRoom: 0
+  readonly property int gh: headRoom > 0 ? headRoom + 13 : 14
   readonly property real p: Math.max(1, Math.floor(Math.min(width / gw, height / gh)))
   property bool blink: false
   implicitWidth: gw * 2
@@ -13,6 +17,8 @@ Item {
 
   onMoodChanged: canvas.requestPaint()
   onBlinkChanged: canvas.requestPaint()
+  onClothesChanged: canvas.requestPaint()
+  onHeadRoomChanged: canvas.requestPaint()
   onWidthChanged: canvas.requestPaint()
   onHeightChanged: canvas.requestPaint()
 
@@ -32,7 +38,7 @@ Item {
       ctx.reset()
       var p = root.p
       var ox = Math.floor((width - root.gw * p) / 2)
-      var oy = Math.floor((height - root.gh * p) / 2)
+      var oy = Math.floor((height - root.gh * p) / 2) + root.headRoom * p
       function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(ox + x * p, oy + y * p, w * p, h * p) }
       var front = "#EE7E55", side = "#C2582F", top = "#F7A07B", ink = "#1A1A1A"
       // body
@@ -42,6 +48,9 @@ Item {
       px(2, 1, 1, 1, top)
       // legs
       px(3, 11, 1, 2, side); px(6, 11, 1, 2, side); px(9, 11, 1, 2, side); px(12, 11, 1, 2, side)
+      // clothes
+      for (var k = 0; k < root.clothes.length; k++)
+        px(root.clothes[k][0], root.clothes[k][1], 1, 1, root.clothes[k][2])
       // eyes
       var m = root.mood
       var eyes = [4, 10]

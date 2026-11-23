@@ -81,7 +81,8 @@ see what Claude is doing and how many tokens it has written today.
 
 **Seasons**: Claudito dresses for the season where you live (from the country
 in Windows settings, so it is right in both hemispheres). The hat shows when
-it has no work hat on; the outfit, always. The tray icon wears both. *Season* in the menu picks another
+it has no work hat on; the outfit, always. The tray icon and the
+face in the usage panel wear both. *Season* in the menu picks another
 one or takes either piece off.
 
 | Season | Hat | Outfit |

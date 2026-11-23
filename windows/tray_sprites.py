@@ -1,4 +1,5 @@
-"""Seasonal clothes for the 16 x 16 tray icon: the tiny version of the HATS and
+"""Seasonal clothes for the tiny Claudito (the 16 x 16 tray icon and the face
+in the usage panel): the small version of the HATS and
 OUTFITS in sprites.js. "." is transparent."""
 
 HAT_TOP = -3      # rows above the head; the last one covers its top

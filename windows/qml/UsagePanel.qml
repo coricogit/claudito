@@ -143,8 +143,10 @@ Window {
 
         MiniClaudito {
           Layout.preferredWidth: 48
-          Layout.preferredHeight: 42
+          Layout.preferredHeight: gh * 3
           mood: root.mood
+          clothes: JSON.parse(backend.miniClothes)
+          headRoom: backend.seasonHat ? 3 : 0
         }
 
         ColumnLayout {
