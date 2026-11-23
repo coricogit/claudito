@@ -40,6 +40,18 @@ una terminal o una sesión **Local** en la pestaña Code de la aplicación de
 escritorio de Claude. Las sesiones en la nube no ejecutan tus hooks locales,
 así que Claudito no se entera de ellas.
 
+### Si ya tenías Claudito desde el código fuente
+
+Ejecuta el instalador: cierra la copia antigua, pasa los hooks y el inicio con
+Windows a la nueva y conserva tus ajustes. Después:
+
+- cierra las sesiones de Claude Code que estuvieran abiertas (o ejecuta
+  `/hooks` en ellas) antes de borrar la carpeta antigua: pueden seguir usando
+  su hook
+- borra la carpeta antigua y nada más. No ejecutes su
+  `install.py --uninstall`: desconectaría también la copia nueva. Si ya lo
+  hiciste, vuelve a ejecutar el instalador
+
 ### Desde el código fuente
 
 Necesitas [Python 3.9+](https://www.python.org/downloads/windows/) (marca

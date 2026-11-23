@@ -38,6 +38,17 @@ You need Claude Code running on this computer: the `claude` command in a
 terminal, or a **Local** session in the Code tab of the Claude desktop app.
 Cloud sessions don't run your local hooks, so Claudito can't see them.
 
+### If you already had Claudito from the source code
+
+Just run the installer: it closes the old copy, moves the hooks and *Start with
+Windows* to the new one and keeps your settings. Then:
+
+- close the Claude Code sessions that were open (or run `/hooks` in them)
+  before deleting the old folder: they may still be using its hook
+- delete the old folder, and nothing else. Don't run its
+  `install.py --uninstall`: it would disconnect the new copy too. If you
+  already did, run the installer again
+
 ### From the source code
 
 Needs [Python 3.9+](https://www.python.org/downloads/windows/) (tick **Add
