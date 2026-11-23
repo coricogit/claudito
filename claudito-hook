@@ -10,10 +10,13 @@ import json
 import os
 import sys
 import time
+import traceback
 
 RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
 DIR = os.path.join(RUNTIME, "claudito")
 STATE = os.path.join(DIR, "state.json")
+LOG = os.path.join(DIR, "hook.log")
+LOG_MAX = 100_000
 KEEP_SECONDS = 24 * 3600
 
 SEARCH = {"Read", "Grep", "Glob", "LS", "LSP", "NotebookRead"}
@@ -35,6 +38,44 @@ TOOL_EVENTS = {"PreToolUse", "PostToolUse", "PostToolUseFailure"}
 # A permission request and its PreToolUse run at the same time, as separate
 # processes: within this many seconds either one may land first.
 RACE_SECONDS = 1.5
+
+
+def log_error():
+    """Nobody sees what a hook prints: leave the traceback in hook.log. Never
+    the event itself, which may hold anything."""
+    try:
+        os.makedirs(DIR, mode=0o700, exist_ok=True)
+        big = os.path.exists(LOG) and os.path.getsize(LOG) > LOG_MAX
+        with open(LOG, "w" if big else "a", encoding="utf-8") as f:
+            f.write(time.strftime("%Y-%m-%d %H:%M:%S ") + traceback.format_exc() + "\n")
+    except OSError:
+        pass
+
+
+def same_dir(a, b):
+    return os.path.normcase(os.path.normpath(a)) == os.path.normcase(os.path.normpath(b))
+
+
+def project_name(cwd, old):
+    """The project of the session. The folder it started in, not the current
+    one, which moves around as Claude works. Sessions started in the home
+    folder have no project of their own: the last git repository they entered."""
+    cwd = str(cwd or "")
+    home = os.path.expanduser("~")
+    root = os.environ.get("CLAUDE_PROJECT_DIR") or cwd
+    if not root:
+        return old
+    if not same_dir(root, home):
+        return os.path.basename(os.path.normpath(root)) or root
+    d = os.path.normpath(cwd) if cwd else home
+    while not same_dir(d, home):
+        if os.path.exists(os.path.join(d, ".git")):
+            return os.path.basename(d)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return old or os.path.basename(os.path.normpath(home))
 
 
 def mode_for_tool(tool):
@@ -138,6 +179,7 @@ def main():
     try:
         ev = json.load(sys.stdin)
     except ValueError:
+        log_error()
         return
     now = time.time()
     result = event_to_state(ev)
@@ -168,7 +210,7 @@ def main():
             "mode": mode,
             "tool": tool,
             "detail": detail,
-            "project": os.path.basename(str(ev.get("cwd") or "").rstrip("/")),
+            "project": project_name(ev.get("cwd"), old.get("project") or ""),
             "agent": str(ev.get("agent_id") or ""),
             "ts": now,
         }
@@ -201,5 +243,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:  # never break Claude Code
-        pass
+        log_error()
     sys.exit(0)

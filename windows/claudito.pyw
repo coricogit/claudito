@@ -23,7 +23,7 @@ import fullscreen  # noqa: E402
 
 compat.setup_env()
 
-from PySide6.QtCore import (QLocale, QLockFile, QObject, QPoint, QSettings,  # noqa: E402
+from PySide6.QtCore import (QDateTime, QLocale, QLockFile, QObject, QPoint, QSettings,  # noqa: E402
                             Qt, QTimer, QUrl, Property, Signal, Slot)
 from PySide6.QtGui import QAction, QActionGroup, QColor, QCursor, QGuiApplication, QIcon, QPainter, QPixmap  # noqa: E402
 from PySide6.QtQml import QQmlApplicationEngine  # noqa: E402
@@ -32,6 +32,7 @@ from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon  # noqa: E402
 
 import install  # noqa: E402  (autostart helpers)
+import limits  # noqa: E402
 import seasons  # noqa: E402
 import tray_sprites  # noqa: E402
 
@@ -59,6 +60,7 @@ TEXT = {
         "autostart": "Start with Windows",
         "quit": "Quit",
         "tipToday": "Today: {out} tokens written",
+        "tipLimits": "Plan: {limits}",
         "already": "Claudito is already running (look in the tray).",
     },
     "es": {
@@ -80,6 +82,7 @@ TEXT = {
         "autostart": "Iniciar con Windows",
         "quit": "Salir",
         "tipToday": "Hoy: {out} tokens escritos",
+        "tipLimits": "Plan: {limits}",
         "already": "Claudito ya está abierto (búscalo en la bandeja).",
     },
 }
@@ -94,6 +97,12 @@ def duration(seconds):
     m, s = divmod(int(seconds), 60)
     h, m = divmod(m, 60)
     return f"{h} h {m} min" if h else f"{m} min {s} s" if m else f"{s} s"
+
+
+def reset_time(at):
+    """"16:00", or "Tue 12:00" if it is not within a day."""
+    fmt = "HH:mm" if at - time.time() < 86400 else "ddd HH:mm"
+    return QLocale.system().toString(QDateTime.fromSecsSinceEpoch(int(at)), fmt)
 
 
 def log_error(what):
@@ -226,6 +235,9 @@ class Backend(QObject):
         out = today.get("out")
         return out if isinstance(out, (int, float)) else None
 
+    def limit_rows(self):
+        return limits.rows(self._usage_data)
+
     # ----- what the buddy is doing (set from QML, used by the tray) -----
     def _get_activity(self):
         return self._activity
@@ -344,9 +356,9 @@ def tray_pixmap(mood, waiting=False, size=32, hat="", outfit=""):
     if mood == "happy":
         px(3, 7, 2, 1, "#F28B82"); px(12, 7, 2, 1, "#F28B82")
     if waiting:   # Claude Code is waiting for you: a little "!" badge
-        qp.fillRect(size - 3 * p - 1, 0, 3 * p + 1, 8 * p, QColor("#E67700"))
-        qp.fillRect(size - 2 * p - 1, p, p + 1, 4 * p, QColor("#FFF3BF"))
-        qp.fillRect(size - 2 * p - 1, 6 * p, p + 1, p, QColor("#FFF3BF"))
+        qp.fillRect(size - 3 * p, 0, 3 * p, 8 * p, QColor("#E67700"))
+        qp.fillRect(size - 2 * p, p, p, 4 * p, QColor("#FFF3BF"))
+        qp.fillRect(size - 2 * p, 6 * p, p, p, QColor("#FFF3BF"))
     qp.end()
     return pm
 
@@ -589,6 +601,9 @@ class Claudito(QObject):
         mode = self.backend.mode
         mood = ("sleep" if mode == "sleep" else "worried" if mode in ("waiting", "oops")
                 else "happy" if mode in ("idle", "done", "wake") else "focus")
+        rows = self.backend.limit_rows()
+        if mood != "sleep" and limits.strained(rows):   # little left of the plan
+            mood = "worried"
         self.tray.setIcon(self._icon(mood, waiting=mode == "waiting"))
 
         lines = ["Claudito: " + self.backend.activity if self.backend.activity else "Claudito"]
@@ -596,7 +611,9 @@ class Claudito(QObject):
         if out is not None:
             text = f"{out / 1000:.1f} k" if out >= 1000 else str(int(out))
             lines.append(tr("tipToday").format(out=text))
-        self.tray.setToolTip("\n".join(lines))
+        if rows:
+            lines.append(tr("tipLimits").format(limits=limits.text(rows, reset_time)))
+        self.tray.setToolTip(limits.fit(lines))
 
 
 def main():

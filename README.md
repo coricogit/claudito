@@ -71,7 +71,8 @@ it). Remove everything with `py windows\install.py --uninstall`.
 **The tray icon** is a mini Claudito whose face follows what Claude is doing:
 asleep, focused while it works, happy when it's done, worried when something
 fails. An orange **!** appears when Claude Code is waiting for you. Hover it to
-see what Claude is doing and how many tokens it has written today.
+see what Claude is doing, how many tokens it has written today and how much of
+your plan's 5-hour and weekly limits is used. From 80 % it looks worried.
 
 - **click**: the usage panel
 - **middle-click**: show or hide the buddy
@@ -113,16 +114,16 @@ Other system tray icons*.
 Click the tray icon for:
 
 - your plan and account (email hidden until you click it)
+- plan limits: 5-hour window and week, with when each one resets
 - tokens written/read, replies and sessions for today, 7 and 30 days
 - a 14-day chart and the projects and models you use most
 - a button to open your usage page on claude.ai
 
 It closes when you click elsewhere. Everything comes from files Claude Code
 keeps on your computer (`~/.claude.json` and the session histories in
-`~/.claude\projects`); nothing is sent anywhere. Plan limits and the live
-session aren't shown on Windows: Claude Code only reports them to its status
-line, which the Code tab of the Claude desktop app doesn't run. Check them on
-claude.ai.
+`~/.claude\projects`); nothing is sent anywhere. Plan limits come from Claude
+Code's status line, which the terminal runs and the Code tab of the Claude
+desktop app doesn't: they show once a terminal session has reported them.
 
 ## How it works
 
@@ -137,6 +138,7 @@ it:
 | Buddy window | `windows\qml\Buddy.qml` | `plasma/.../Character.qml`, `hats.js`, `sprites.js`, `strings.js` |
 | Usage panel | `windows\qml\UsagePanel.qml` | `plasma/.../MiniClaudito.qml`, usage `strings.js` |
 | What to show, notifications | `windows\activity.py` | — |
+| Plan limits on the tray icon | `windows\limits.py` | `claudito-usage` |
 | Seasons | `windows\seasons.py` | `Character.qml`, `sprites.js` |
 | Full-screen detection | `windows\fullscreen.py` | — |
 | App and tray | `windows\claudito.pyw` | — |
@@ -161,6 +163,9 @@ No hook fires when you answer a permission prompt, press Esc or close the
 terminal, so `activity.py` also looks at the status Claude Code keeps in
 `~/.claude\sessions`. That folder is internal to Claude Code: if it changes,
 Claudito goes back to relying on the hooks alone.
+
+If the hook fails it says so in `%LOCALAPPDATA%\claudito\hook.log`; the app,
+in `claudito.log` next to it.
 
 Tests: `py -m unittest discover -s windows/tests`.
 

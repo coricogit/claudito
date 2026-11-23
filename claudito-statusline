@@ -8,6 +8,7 @@ usage widget, and prints a short status line.
 import json
 import os
 import sys
+import tempfile
 import time
 
 RUNTIME = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
@@ -23,10 +24,24 @@ except ValueError:
 try:
     os.makedirs(DIR, mode=0o700, exist_ok=True)
     data["_saved"] = time.time()
-    tmp = os.path.join(DIR, "statusline.json.tmp")
-    with open(tmp, "w") as f:
-        json.dump(data, f)
-    os.replace(tmp, os.path.join(DIR, "statusline.json"))
+    # Leftovers of status lines that Claude Code stopped halfway.
+    for name in os.listdir(DIR):
+        if name.startswith(".statusline-"):
+            old = os.path.join(DIR, name)
+            try:
+                if time.time() - os.path.getmtime(old) > 60:
+                    os.unlink(old)
+            except OSError:
+                pass
+    # A file of its own: several sessions may be writing at once.
+    fd, tmp = tempfile.mkstemp(dir=DIR, prefix=".statusline-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f)
+        os.replace(tmp, os.path.join(DIR, "statusline.json"))
+    except BaseException:
+        os.unlink(tmp)
+        raise
 except OSError:
     pass
 

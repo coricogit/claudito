@@ -14,6 +14,7 @@ sys.path.insert(0, WINDOWS)
 
 import activity  # noqa: E402
 import fullscreen  # noqa: E402
+import limits  # noqa: E402
 import seasons  # noqa: E402
 import tray_sprites  # noqa: E402
 
@@ -34,10 +35,12 @@ class Hook(unittest.TestCase):
 
     def send(self, event, **fields):
         ev = {"hook_event_name": event, "session_id": "s", "cwd": "/x/proj", **fields}
-        r = subprocess.run([sys.executable, HOOK], input=json.dumps(ev).encode(), env=self.env,
-                           capture_output=True, timeout=20)
-        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, b"", b""))
+        self.run_hook(json.dumps(ev).encode())
         return self.state()
+
+    def run_hook(self, data):
+        r = subprocess.run([sys.executable, HOOK], input=data, env=self.env, capture_output=True, timeout=20)
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, b"", b""))
 
     def state(self):
         try:
@@ -97,6 +100,101 @@ class Hook(unittest.TestCase):
         turn = self.send("UserPromptSubmit")["turn"]
         self.send("PreToolUse", **GREP)
         self.assertEqual(self.send("Stop")["turn"], turn)
+
+
+    def project(self, cwd, root=None):
+        self.env.pop("CLAUDE_PROJECT_DIR", None)
+        if root:
+            self.env["CLAUDE_PROJECT_DIR"] = root
+        return self.send("PreToolUse", **{**GREP, "cwd": cwd})["project"]
+
+    def test_project_is_where_the_session_started(self):
+        a = os.path.join(self.dir, "proj")
+        os.makedirs(os.path.join(a, "src", "deep"))
+        self.assertEqual(self.project(a, root=a), "proj")
+        self.assertEqual(self.project(os.path.join(a, "src", "deep"), root=a), "proj")
+        self.assertEqual(self.project(a + os.sep), "proj")   # older Claude Code: no variable
+
+    def test_project_of_a_session_started_at_home(self):
+        home = os.path.join(self.dir, "someone")
+        repo, other = os.path.join(home, "src", "repo"), os.path.join(home, "notes")
+        os.makedirs(os.path.join(repo, ".git"))
+        os.makedirs(os.path.join(repo, "sub"))
+        os.makedirs(other)
+        os.makedirs(os.path.join(home, ".git"))   # dotfiles in git: not a project
+        self.env.update(USERPROFILE=home, HOME=home)
+        self.assertEqual(self.project(home, root=home), "someone")
+        self.assertEqual(self.project(os.path.join(repo, "sub"), root=home), "repo")
+        self.assertEqual(self.project(other, root=home), "repo")   # it stays
+        self.assertEqual(self.project(home, root=home), "repo")
+
+    def log(self):
+        try:
+            with open(os.path.join(self.dir, "claudito", "hook.log"), encoding="utf-8") as f:
+                return f.read()
+        except FileNotFoundError:
+            return ""
+
+    def test_errors_are_logged_without_the_event(self):
+        self.send("Stop")
+        self.assertEqual(self.log(), "")
+        self.run_hook(b'{"secret-thing": ')
+        self.run_hook(b'["secret-thing"]')
+        self.assertIn("JSONDecodeError", self.log())
+        self.assertIn("AttributeError", self.log())
+        self.assertNotIn("secret-thing", self.log())
+
+
+class StatusLine(unittest.TestCase):
+    def test_many_at_once(self):
+        with tempfile.TemporaryDirectory() as d:
+            folder = os.path.join(d, "claudito")
+            os.makedirs(folder)
+            stale = os.path.join(folder, ".statusline-old.tmp")
+            open(stale, "w").close()
+            os.utime(stale, (time.time() - 600,) * 2)
+            env = {**os.environ, "LOCALAPPDATA": d, "XDG_RUNTIME_DIR": d}
+            script = os.path.join(WINDOWS, "claudito_statusline.py")
+            running = [subprocess.Popen([sys.executable, script], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE, env=env) for _ in range(12)]
+            for i, p in enumerate(running):
+                p.stdin.write(json.dumps({"session_id": str(i), "model": {"display_name": "M"}, "pad": "x" * 50_000}).encode())
+                p.stdin.close()
+            for p in running:
+                self.assertEqual((p.stdout.read().strip(), p.stderr.read(), p.wait(20)), (b"M", b"", 0))
+                p.stdout.close()
+                p.stderr.close()
+            self.assertEqual(os.listdir(folder), ["statusline.json"])
+            with open(os.path.join(folder, "statusline.json"), encoding="utf-8") as f:
+                self.assertEqual(len(json.load(f)["pad"]), 50_000)
+
+
+class Limits(unittest.TestCase):
+    def rows(self, **kw):
+        return limits.rows({"live": {"limits": kw}}, NOW)
+
+    def test_rows(self):
+        self.assertEqual(self.rows(five_hour={"percent": 3, "resetsAt": NOW + 60},
+                                   seven_day={"percent": 52.4, "resetsAt": None}),
+                         [("5 h", 3, NOW + 60), ("7 d", 52.4, None)])
+        self.assertEqual(self.rows(five_hour={"percent": 99, "resetsAt": NOW - 1}), [("5 h", 0, None)])
+        for nothing in ({}, None, {"live": None}, {"live": {"limits": {"five_hour": {"percent": None}}}}):
+            self.assertEqual(limits.rows(nothing, NOW), [])
+
+    def test_strained(self):
+        self.assertFalse(limits.strained([]))
+        self.assertFalse(limits.strained([("5 h", 79.9, None)]))
+        self.assertTrue(limits.strained([("5 h", 3, None), ("7 d", 80, None)]))
+
+    def test_text(self):
+        rows = [("5 h", 3, 5), ("7 d", 52.4, None)]
+        self.assertEqual(limits.text(rows, lambda at: f"t{at}"), "5 h 3 % (t5) · 7 d 52 %")
+
+    def test_fit(self):
+        self.assertEqual(limits.fit(["a", "b"]), "a\nb")
+        got = limits.fit(["x" * 200, "tokens", "plan"])
+        self.assertEqual(len(got), 127)
+        self.assertTrue(got.endswith("…\ntokens\nplan"))
 
 
 class SessionMode(unittest.TestCase):

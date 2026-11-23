@@ -72,8 +72,9 @@ reinstala si la mueves). Para quitarlo todo:
 **El icono de la bandeja** es un mini Claudito cuya cara sigue lo que hace
 Claude: dormido, concentrado mientras trabaja, contento cuando termina y
 preocupado si algo falla. Le sale un **!** naranja cuando Claude Code te está
-esperando. Pasa el ratón por encima para ver qué hace Claude y cuántos tokens
-ha escrito hoy.
+esperando. Pasa el ratón por encima para ver qué hace Claude, cuántos tokens
+ha escrito hoy y cuánto llevas usado de los límites de 5 horas y semanal de tu
+plan. A partir del 80 % pone cara de agobio.
 
 - **clic**: el panel de uso
 - **clic central**: mostrar u ocultar el muñeco
@@ -115,16 +116,17 @@ de tareas > Otros iconos de la bandeja del sistema*.
 Haz clic en el icono de la bandeja para ver:
 
 - tu plan y tu cuenta (el correo, oculto hasta que haces clic)
+- los límites del plan: ventana de 5 horas y semana, y cuándo se reinician
 - tokens escritos y leídos, respuestas y sesiones de hoy, 7 y 30 días
 - una gráfica de 14 días y los proyectos y modelos que más usas
 - un botón para abrir tu página de uso en claude.ai
 
 Se cierra al hacer clic fuera. Todo sale de archivos que Claude Code guarda en
 tu ordenador (`~/.claude.json` y los historiales de sesión de
-`~/.claude\projects`); no se envía nada a ningún sitio. En Windows no se
-muestran los límites del plan ni la sesión en curso: Claude Code solo los pasa
-a su línea de estado, y la pestaña Code de la aplicación de escritorio de
-Claude no la ejecuta. Puedes consultarlos en claude.ai.
+`~/.claude\projects`); no se envía nada a ningún sitio. Los límites del plan
+llegan por la línea de estado de Claude Code, que se ejecuta en la terminal
+pero no en la pestaña Code de la aplicación de escritorio de Claude: aparecen
+cuando una sesión de terminal los comunica.
 
 ## Cómo funciona
 
@@ -139,6 +141,7 @@ copiarlo:
 | Ventana del muñeco | `windows\qml\Buddy.qml` | `plasma/.../Character.qml`, `hats.js`, `sprites.js`, `strings.js` |
 | Panel de uso | `windows\qml\UsagePanel.qml` | `plasma/.../MiniClaudito.qml`, `strings.js` de uso |
 | Qué mostrar y avisos | `windows\activity.py` | — |
+| Límites del plan en la bandeja | `windows\limits.py` | `claudito-usage` |
 | Estaciones | `windows\seasons.py` | `Character.qml`, `sprites.js` |
 | Detección de pantalla completa | `windows\fullscreen.py` | — |
 | Aplicación y bandeja | `windows\claudito.pyw` | — |
@@ -163,6 +166,9 @@ Ningún hook avisa cuando respondes a un permiso, pulsas Esc o cierras la
 terminal, así que `activity.py` también mira el estado que Claude Code guarda
 en `~/.claude\sessions`. Esa carpeta es interna de Claude Code: si cambia,
 Claudito vuelve a usar solo los hooks.
+
+Si el hook falla, lo deja escrito en `%LOCALAPPDATA%\claudito\hook.log`; la
+aplicación, en `claudito.log`, al lado.
 
 Pruebas: `py -m unittest discover -s windows/tests`.
 
