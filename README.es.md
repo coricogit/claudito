@@ -83,7 +83,8 @@ ha escrito hoy.
 
 **Estaciones**: Claudito se viste según la estación de donde vives (por el
 país de la configuración de Windows, así que acierta en los dos hemisferios).
-El gorro sale cuando no lleva uno de trabajo; el traje, siempre. En *Estación*,
+El gorro sale cuando no lleva uno de trabajo; el traje, siempre. El icono de
+la bandeja lleva los dos. En *Estación*,
 en el menú, puedes elegir otra o quitarle cualquiera de las dos prendas.
 
 | Estación | Gorro | Traje |

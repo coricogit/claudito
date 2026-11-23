@@ -33,6 +33,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon  # noqa: E402
 
 import install  # noqa: E402  (autostart helpers)
 import seasons  # noqa: E402
+import tray_sprites  # noqa: E402
 
 QML_DIR = os.path.join(HERE, "qml")
 SIZES = {"small": 2, "medium": 3, "large": 4}   # pixels per Claudito pixel
@@ -289,13 +290,15 @@ class Backend(QObject):
 # Tray icon: the panel's MiniClaudito, painted with QPainter
 # ---------------------------------------------------------------------------
 
-def tray_pixmap(mood, waiting=False, size=32):
+def tray_pixmap(mood, waiting=False, size=32, hat="", outfit=""):
+    """`hat` and `outfit` are seasons, or "" for none."""
     pm = QPixmap(size, size)
     pm.fill(Qt.GlobalColor.transparent)
     qp = QPainter(pm)
     p = size // 16
     ox = (size - 16 * p) // 2
-    oy = (size - 14 * p) // 2 + p // 2
+    # A hat needs the three rows above the head: stand on the bottom edge.
+    oy = 3 * p if hat else p   # whole pixels: it stays sharp at 16 x 16
 
     def px(x, y, w, h, c):
         qp.fillRect(ox + x * p, oy + y * p, w * p, h * p, QColor(c))
@@ -307,6 +310,13 @@ def tray_pixmap(mood, waiting=False, size=32):
     px(2, 1, 1, 1, top)
     for x in (3, 6, 9, 12):
         px(x, 11, 1, 2, side)
+    if outfit:
+        for x, y, c in tray_sprites.pixels(tray_sprites.OUTFITS[outfit], tray_sprites.OUTFIT_TOP):
+            # The left column is in shade, like the body's.
+            px(x, y, 1, 1, QColor(c).darker(130) if x == 1 else c)
+    if hat:
+        for x, y, c in tray_sprites.pixels(tray_sprites.HATS[hat], tray_sprites.HAT_TOP):
+            px(x, y, 1, 1, c)
     for i, x in enumerate((4, 10)):
         if mood == "sleep":
             px(x, 5, 3, 1, ink)
@@ -366,6 +376,7 @@ class Claudito(QObject):
         self.backend.notify.connect(self._notify)
         self.backend.usageChanged.connect(self._update_tray)
         self.backend.activityChanged.connect(self._update_tray)
+        self.backend.clothesChanged.connect(self._update_tray)
         self._update_tray()
 
     def _load(self, name):
@@ -529,7 +540,7 @@ class Claudito(QObject):
 
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self._on_tray)
-        self.tray.setIcon(QIcon(tray_pixmap("sleep")))
+        self.tray.setIcon(self._icon("sleep"))
         self.tray.show()
 
     def _on_tray(self, reason):
@@ -551,13 +562,16 @@ class Claudito(QObject):
         if view["project"]:
             title += " · " + view["project"]
         mood = "worried" if kind == "waiting" else "happy"
-        self.tray.showMessage(title, text, QIcon(tray_pixmap(mood, waiting=kind == "waiting", size=64)), 8000)
+        self.tray.showMessage(title, text, self._icon(mood, waiting=kind == "waiting", size=64), 8000)
+
+    def _icon(self, mood, **kw):
+        return QIcon(tray_pixmap(mood, hat=self.backend.seasonHat, outfit=self.backend.seasonOutfit, **kw))
 
     def _update_tray(self):
         mode = self.backend.mode
         mood = ("sleep" if mode == "sleep" else "worried" if mode in ("waiting", "oops")
                 else "happy" if mode in ("idle", "done", "wake") else "focus")
-        self.tray.setIcon(QIcon(tray_pixmap(mood, waiting=mode == "waiting")))
+        self.tray.setIcon(self._icon(mood, waiting=mode == "waiting"))
 
         lines = ["Claudito: " + self.backend.activity if self.backend.activity else "Claudito"]
         out = self.backend.tokens_today()

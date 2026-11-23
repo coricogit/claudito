@@ -15,6 +15,7 @@ sys.path.insert(0, WINDOWS)
 import activity  # noqa: E402
 import fullscreen  # noqa: E402
 import seasons  # noqa: E402
+import tray_sprites  # noqa: E402
 
 HOOK = os.path.join(WINDOWS, "claudito_hook.py")
 NOW = 1_000_000.0
@@ -287,6 +288,15 @@ class Seasons(unittest.TestCase):
         self.assertEqual(seasons.season_on(dt.date(2026, 1, 1), southern=True), "summer")
         self.assertIn("AR", seasons.SOUTHERN)
         self.assertNotIn("MX", seasons.SOUTHERN)
+
+    def test_tray_sprites(self):
+        for sprites, top, last in ((tray_sprites.HATS, tray_sprites.HAT_TOP, 0),
+                                   (tray_sprites.OUTFITS, tray_sprites.OUTFIT_TOP, 10)):
+            self.assertEqual(set(sprites), set(seasons.SEASONS))
+            for season, sprite in sprites.items():
+                self.assertEqual({len(r) for r in sprite[1]}, {16}, season)
+                self.assertEqual(top + len(sprite[1]) - 1, last, season)
+                self.assertTrue(list(tray_sprites.pixels(sprite, top)))   # every color is known
 
     def test_sprites(self):
         """Every season has a hat and an outfit, with even rows and known colors."""
