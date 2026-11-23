@@ -36,6 +36,7 @@ import seasons  # noqa: E402
 import tray_sprites  # noqa: E402
 
 QML_DIR = os.path.join(HERE, "qml")
+TOAST_MS = 5000   # how long a notification stays up
 SIZES = {"small": 2, "medium": 3, "large": 4}   # pixels per Claudito pixel
 
 TEXT = {
@@ -382,6 +383,7 @@ class Claudito(QObject):
 
         self._build_tray()
         self.backend.menuRequested.connect(lambda: self.menu.popup(QCursor.pos()))
+        self._toast_timer = QTimer(self, singleShot=True, interval=TOAST_MS, timeout=self._hide_toast)
         self.backend.notify.connect(self._notify)
         self.backend.usageChanged.connect(self._update_tray)
         self.backend.activityChanged.connect(self._update_tray)
@@ -571,7 +573,14 @@ class Claudito(QObject):
         if view["project"]:
             title += " · " + view["project"]
         mood = "worried" if kind == "waiting" else "happy"
-        self.tray.showMessage(title, text, self._icon(mood, waiting=kind == "waiting", size=64), 8000)
+        self.tray.showMessage(title, text, self._icon(mood, waiting=kind == "waiting", size=64), TOAST_MS)
+        if compat.IS_WINDOWS:
+            self._toast_timer.start()   # counts again if one was already up
+
+    def _hide_toast(self):
+        # Windows ignores the time asked for. An empty message takes the
+        # notification away, also from the notification center.
+        self.tray.showMessage("", "", QIcon(), 0)
 
     def _icon(self, mood, **kw):
         return QIcon(tray_pixmap(mood, hat=self.backend.seasonHat, outfit=self.backend.seasonOutfit, **kw))
