@@ -84,6 +84,8 @@ Window {
     visible: win.visible   // don't animate while hidden
     mode: win.mode
     hat: win.hat
+    seasonHat: backend.seasonHat
+    seasonOutfit: backend.seasonOutfit
 
     SequentialAnimation {
       id: poke

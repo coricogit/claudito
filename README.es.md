@@ -78,8 +78,20 @@ ha escrito hoy.
 - **clic**: el panel de uso
 - **clic central**: mostrar u ocultar el muñeco
 - **clic derecho**: mostrar el muñeco, uso, tamaño (pequeño / mediano /
-  grande), siempre encima, avisos, ocultar con apps a pantalla completa,
+  grande), estación, siempre encima, avisos, ocultar con apps a pantalla completa,
   iniciar con Windows, salir
+
+**Estaciones**: Claudito se viste según la estación de donde vives (por el
+país de la configuración de Windows, así que acierta en los dos hemisferios).
+El gorro sale cuando no lleva uno de trabajo; el traje, siempre. En *Estación*,
+en el menú, puedes elegir otra o quitarle cualquiera de las dos prendas.
+
+| Estación | Gorro | Traje |
+|---|---|---|
+| Primavera | Corona de flores | Peto de jardinero |
+| Verano | Sombrero de paja | Camisa hawaiana |
+| Otoño | Gorro de bellota con una hoja | Suéter tejido |
+| Invierno | Gorro de lana con pompón | Bufanda |
 
 **Varias sesiones**: primero se muestra la que te necesita, después las que
 trabajan y al final las inactivas.
@@ -125,6 +137,7 @@ copiarlo:
 | Ventana del muñeco | `windows\qml\Buddy.qml` | `plasma/.../Character.qml`, `hats.js`, `sprites.js`, `strings.js` |
 | Panel de uso | `windows\qml\UsagePanel.qml` | `plasma/.../MiniClaudito.qml`, `strings.js` de uso |
 | Qué mostrar y avisos | `windows\activity.py` | — |
+| Estaciones | `windows\seasons.py` | `Character.qml`, `sprites.js` |
 | Detección de pantalla completa | `windows\fullscreen.py` | — |
 | Aplicación y bandeja | `windows\claudito.pyw` | — |
 

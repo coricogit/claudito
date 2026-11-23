@@ -32,6 +32,7 @@ from PySide6.QtQuickControls2 import QQuickStyle  # noqa: E402
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon  # noqa: E402
 
 import install  # noqa: E402  (autostart helpers)
+import seasons  # noqa: E402
 
 QML_DIR = os.path.join(HERE, "qml")
 SIZES = {"small": 2, "medium": 3, "large": 4}   # pixels per Claudito pixel
@@ -47,6 +48,10 @@ TEXT = {
         "notify": "Notifications",
         "notifyWaiting": "When Claude needs you",
         "notifyDone": "When a long task ends",
+        "season": "Season",
+        "auto": "Automatic ({season})", "none": "None",
+        "spring": "Spring", "summer": "Summer", "autumn": "Autumn", "winter": "Winter",
+        "wearHat": "Seasonal hat", "wearOutfit": "Seasonal outfit",
         "toastWaiting": "Claude needs you", "toastWaitingText": "It is waiting for your answer.",
         "toastDone": "Claude has finished", "toastDoneText": "It took {time}.",
         "autostart": "Start with Windows",
@@ -64,6 +69,10 @@ TEXT = {
         "notify": "Avisos",
         "notifyWaiting": "Cuando Claude te necesite",
         "notifyDone": "Al terminar una tarea larga",
+        "season": "Estación",
+        "auto": "Automática ({season})", "none": "Ninguna",
+        "spring": "Primavera", "summer": "Verano", "autumn": "Otoño", "winter": "Invierno",
+        "wearHat": "Gorro de estación", "wearOutfit": "Traje de estación",
         "toastWaiting": "Claude te necesita", "toastWaitingText": "Está esperando tu respuesta.",
         "toastDone": "Claude ha terminado", "toastDoneText": "Ha tardado {time}.",
         "autostart": "Iniciar con Windows",
@@ -111,6 +120,7 @@ class Backend(QObject):
     usageChanged = Signal()
     settingsChanged = Signal()
     activityChanged = Signal()
+    clothesChanged = Signal()
     _usageReady = Signal(str)
 
     def __init__(self, settings):
@@ -132,6 +142,11 @@ class Backend(QObject):
         self._state_timer = QTimer(self, interval=500, timeout=self._poll_state)
         self._state_timer.start()
         self._poll_state()
+
+        self._clothes = ("", "")
+        self._season_timer = QTimer(self, interval=60000, timeout=self._refresh_season)
+        self._season_timer.start()
+        self._refresh_season()
 
         self._usage_timer = QTimer(self, interval=30000, timeout=self.refreshUsage)
         self._usage_timer.start()
@@ -240,6 +255,27 @@ class Backend(QObject):
         return self.settings.value("onTop", True, type=bool)
 
     onTop = Property(bool, _get_on_top, notify=settingsChanged)
+
+    # ----- seasonal clothes -----
+    def auto_season(self):
+        return seasons.current(QLocale.territoryToCode(QLocale.system().territory()))
+
+    def _refresh_season(self):
+        """Dresses Claudito again if the season, or what you chose, changed."""
+        chosen = self.settings.value("season", "auto")
+        name = chosen if chosen in seasons.SEASONS else "" if chosen == "none" else self.auto_season()
+        clothes = (name if self.settings.value("wearHat", True, type=bool) else "",
+                   name if self.settings.value("wearOutfit", True, type=bool) else "")
+        if clothes != self._clothes:
+            self._clothes = clothes
+            self.clothesChanged.emit()
+
+    def set_clothes(self, key, value):
+        self.settings.setValue(key, value)
+        self._refresh_season()
+
+    seasonHat = Property(str, lambda self: self._clothes[0], notify=clothesChanged)
+    seasonOutfit = Property(str, lambda self: self._clothes[1], notify=clothesChanged)
 
     # ----- called from QML -----
     menuRequested = Signal()
@@ -443,6 +479,25 @@ class Claudito(QObject):
             a.triggered.connect(lambda _=False, k=key: self.set_size(k))
             group.addAction(a)
             size_menu.addAction(a)
+
+        season_menu = menu.addMenu(tr("season"))
+        season_group = QActionGroup(season_menu)
+        chosen = self.settings.value("season", "auto")
+        for key in ("auto", *seasons.SEASONS, "none"):
+            a = QAction(tr(key), season_menu, checkable=True)
+            a.setChecked(key == chosen)
+            a.triggered.connect(lambda _=False, k=key: self.backend.set_clothes("season", k))
+            season_group.addAction(a)
+            season_menu.addAction(a)
+            if key == "auto":
+                season_menu.aboutToShow.connect(
+                    lambda a=a: a.setText(tr("auto").format(season=tr(self.backend.auto_season()).lower())))
+        season_menu.addSeparator()
+        for key in ("wearHat", "wearOutfit"):
+            a = QAction(tr(key), season_menu, checkable=True)
+            a.setChecked(self._flag(key))
+            a.toggled.connect(lambda on, k=key: self.backend.set_clothes(k, on))
+            season_menu.addAction(a)
 
         on_top = QAction(tr("onTop"), menu, checkable=True)
         on_top.setChecked(self.backend.onTop)

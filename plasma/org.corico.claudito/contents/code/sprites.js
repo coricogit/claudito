@@ -138,6 +138,115 @@ var HATS = {
       ".........kpppppyppk.......",
       ".........yyyyyyyyyyy......"
     ]
+  },
+
+  // Seasonal hats, worn when there is no work hat on.
+  spring: {
+    palette: { p: "#F783AC", w: "#FFFFFF", v: "#B197FC", y: "#FFD43B", g: "#2F9E44", L: "#69DB7C" },
+    rows: [
+      "....pp......ww......vv....",
+      "...pyyp....wyyw....vyyv...",
+      ".ggpyypgLggwyywggLgvyyvgg.",
+      "..gLppgggLggwwggLgggvvLg.."
+    ]
+  },
+  summer: {
+    palette: { s: "#F2D388", S: "#E0B84C", k: "#B58B2A", r: "#E03131" },
+    rows: [
+      ".........kkkkkkkk.........",
+      "........kSsSsSsSsk........",
+      ".......ksSsSsSsSsSk.......",
+      "......kSsSsSsSsSsSsk......",
+      "......krrrrrrrrrrrrk......",
+      "..kSsSsSsSsSsSsSsSsSsSsk..",
+      ".kssssssssssssssssssssssk."
+    ]
+  },
+  autumn: {
+    palette: { c: "#C68642", C: "#A5662B", d: "#6B3F16", s: "#4A2C17", o: "#F76707", O: "#D9480F" },
+    rows: [
+      "............sss...o.......",
+      "............ss...ooo......",
+      "........dcCcCcCcCoOo......",
+      "......dcCcCcCcCcCcOd......",
+      ".....dCcCcCcCcCcCcCcd.....",
+      "....dcCcCcCcCcCcCcCcCd....",
+      "...dCcCcCcCcCcCcCcCcCcd...",
+      "...dddddddddddddddddddd..."
+    ]
+  },
+  winter: {
+    palette: { w: "#F8F9FA", g: "#CED4DA", t: "#1C7ED6", T: "#1864AB" },
+    rows: [
+      "...........wwww...........",
+      "..........wwwwgg..........",
+      "...........wwgg...........",
+      ".........tttttttt.........",
+      ".......tttTtttTtttT.......",
+      "......tttTtttTtttTtt......",
+      "......ttTtttTtttTttt......",
+      "...wgwgwgwgwgwgwgwgwgwg...",
+      "...wgwgwgwgwgwgwgwgwgwg..."
+    ]
+  }
+}
+
+// Seasonal clothes over the lower part of the body (26 x 8, from its left
+// edge). "sleeve" also dresses the arms.
+var OUTFITS = {
+  spring: {
+    palette: { g: "#69DB7C", G: "#2F9E44", y: "#FFD43B", p: "#F783AC" },
+    rows: [
+      "....GG..............GG....",
+      "....GyggggggggggggggyG....",
+      "....GggggggppggggggggG....",
+      "....GgggggpyypgggggggG....",
+      "Gggggggggggppggggggggggggg",
+      "Gggggggggggggggggggggggggg",
+      "Gggggggggggggggggggggggggg",
+      ".GGGGGGGGGGGGGGGGGGGGGGGG."
+    ]
+  },
+  summer: {
+    sleeve: "#15AABF",
+    palette: { b: "#15AABF", B: "#0B7285", c: "#E3FAFC", y: "#FFD43B", p: "#FF8FB8", o: "#FFFFFF", w: "#E3FAFC" },
+    rows: [
+      "bbbbbbbbcc......ccbbbbbbbb",
+      "bbybbbbbbcc....ccbbpbbbbbb",
+      "byoybbpbbbcc..ccbbpopbbybb",
+      "bbybbpopbbbbccbbbbbpbbyoyb",
+      "bbbbbbpbbbbbwbbbbbbbbbbybb",
+      "bbbpbbbbbbybbbbbbpbbbbbbbb",
+      "bbpopbbbbyoybwbbpopbbbbbbb",
+      ".BBBBBBBBBBBBBBBBBBBBBBBB."
+    ]
+  },
+  autumn: {
+    sleeve: "#8C2F39",
+    palette: { m: "#8C2F39", M: "#6D1F29", z: "#F2B134" },
+    rows: [
+      "mmmmmmMmMmMmMmMmMmMmmmmmmm",
+      "mmmmmmmmmmmmmmmmmmmmmmmmmm",
+      "zmmmzmmmzmmmzmmmzmmmzmmmzm",
+      "mzmzmzmzmzmzmzmzmzmzmzmzmz",
+      "mmzmmmzmmmzmmmzmmmzmmmzmmm",
+      "mmmmmmmmmmmmmmmmmmmmmmmmmm",
+      "mmmmmmmmmmmmmmmmmmmmmmmmmm",
+      ".MmMmMmMmMmMmMmMmMmMmMmMm."
+    ]
+  },
+  winter: {
+    palette: { r: "#E03131", w: "#F8F9FA", d: "#8E1B1B" },
+    rows: [
+      "rrrrwwrrrrwwrrrrwwrrrrwwrr",
+      "rrrrwwrrrrwwrrrrwwrrrrwwrr",
+      "dddddddddddddddddddddddddd",
+      "...............drrrrd.....",
+      "...............dwwwwd.....",
+      "...............drrrrd.....",
+      "...............drrrrd.....",
+      "...............w.ww.w....."
+    ]
   }
 }
 

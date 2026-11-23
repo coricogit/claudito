@@ -76,8 +76,20 @@ see what Claude is doing and how many tokens it has written today.
 - **click**: the usage panel
 - **middle-click**: show or hide the buddy
 - **right-click**: show the buddy, usage, size (small / medium / large),
-  always on top, notifications, hide behind full-screen apps, start with
+  season, always on top, notifications, hide behind full-screen apps, start with
   Windows, quit
+
+**Seasons**: Claudito dresses for the season where you live (from the country
+in Windows settings, so it is right in both hemispheres). The hat shows when
+it has no work hat on; the outfit, always. *Season* in the menu picks another
+one or takes either piece off.
+
+| Season | Hat | Outfit |
+|---|---|---|
+| Spring | Flower crown | Gardening overalls |
+| Summer | Straw hat | Hawaiian shirt |
+| Autumn | Acorn cap with a leaf | Knitted sweater |
+| Winter | Bobble hat | Scarf |
 
 **Several sessions**: one that needs you always shows first, then the ones
 working, then the idle ones.
@@ -123,6 +135,7 @@ it:
 | Buddy window | `windows\qml\Buddy.qml` | `plasma/.../Character.qml`, `hats.js`, `sprites.js`, `strings.js` |
 | Usage panel | `windows\qml\UsagePanel.qml` | `plasma/.../MiniClaudito.qml`, usage `strings.js` |
 | What to show, notifications | `windows\activity.py` | — |
+| Seasons | `windows\seasons.py` | `Character.qml`, `sprites.js` |
 | Full-screen detection | `windows\fullscreen.py` | — |
 | App and tray | `windows\claudito.pyw` | — |
 

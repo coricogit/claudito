@@ -1,6 +1,8 @@
 """py -m unittest discover -s windows/tests"""
+import datetime as dt
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -12,6 +14,7 @@ sys.path.insert(0, WINDOWS)
 
 import activity  # noqa: E402
 import fullscreen  # noqa: E402
+import seasons  # noqa: E402
 
 HOOK = os.path.join(WINDOWS, "claudito_hook.py")
 NOW = 1_000_000.0
@@ -270,6 +273,36 @@ class Fullscreen(unittest.TestCase):
         self.assertTrue(self.covered("small"))
         del self.api.windows["game"]
         self.assertFalse(self.covered("small"))
+
+
+class Seasons(unittest.TestCase):
+    def test_dates(self):
+        for month, day, want in ((1, 1, "winter"), (3, 19, "winter"), (3, 20, "spring"), (6, 20, "spring"),
+                                 (6, 21, "summer"), (9, 21, "summer"), (9, 22, "autumn"), (11, 23, "autumn"),
+                                 (12, 20, "autumn"), (12, 21, "winter"), (12, 31, "winter"), (2, 29, "winter")):
+            self.assertEqual(seasons.season_on(dt.date(2028, month, day)), want, (month, day))
+
+    def test_south(self):
+        self.assertEqual(seasons.season_on(dt.date(2026, 11, 23), southern=True), "spring")
+        self.assertEqual(seasons.season_on(dt.date(2026, 1, 1), southern=True), "summer")
+        self.assertIn("AR", seasons.SOUTHERN)
+        self.assertNotIn("MX", seasons.SOUTHERN)
+
+    def test_sprites(self):
+        """Every season has a hat and an outfit, with even rows and known colors."""
+        path = os.path.join(os.path.dirname(WINDOWS), "plasma", "org.corico.claudito", "contents", "code", "sprites.js")
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        hats, outfits = text.split("var OUTFITS")
+        for part in (hats, outfits.split("\n}\n")[0]):
+            for season in seasons.SEASONS:
+                m = re.search(r"\n  %s: \{(.*?)\n  \}" % season, part, re.S)
+                self.assertTrue(m, season)
+                colors = set(re.findall(r"(\w): \"#", m[1].split("palette", 1)[1]))
+                rows = re.findall(r'^ +"([^"]+)",?$', m[1], re.M)
+                self.assertTrue(rows)
+                self.assertEqual({len(r) for r in rows}, {26}, season)
+                self.assertLessEqual(set("".join(rows)) - {"."}, colors, season)
 
 
 if __name__ == "__main__":
