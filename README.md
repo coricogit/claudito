@@ -34,7 +34,7 @@ desktop app. Cloud sessions don't run your local hooks, so Claudito can't see
 them.
 
 ```powershell
-git clone -b windows https://github.com/coricogit/claudito.git $HOME\src\claudito
+git clone -b windows-terminal https://github.com/coricogit/claudito.git $HOME\src\claudito
 py $HOME\src\claudito\windows\install.py
 ```
 
