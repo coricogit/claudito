@@ -215,6 +215,11 @@ class SessionMode(unittest.TestCase):
         self.assertEqual(self.mode("thinking", 20, "idle", 5), "idle")
         self.assertEqual(self.mode("terminal", 900, "idle", 700), "sleep")
 
+    def test_idle_just_before_stop_does_not_flicker(self):
+        self.assertEqual(self.mode("thinking", 3, "idle", 0.5), "thinking")
+        self.assertEqual(self.mode("waiting", 3, "idle", 0.5), "waiting")
+        self.assertEqual(self.mode("thinking", 3, "idle", 1.6), "idle")
+
     def test_waiting_expires(self):
         self.assertEqual(self.mode("waiting", 1700), "waiting")
         self.assertEqual(self.mode("waiting", 1900), "sleep")

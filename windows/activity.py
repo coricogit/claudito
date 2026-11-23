@@ -21,6 +21,7 @@ IDLE_SECONDS = 600        # then it falls asleep
 LOST_TOOL_SECONDS = 900   # a tool that never reported back
 LOST_WAIT_SECONDS = 1800  # a request nobody answered, with no session file to ask
 GONE_SECONDS = 5          # missing from the registry this long: it was closed
+SETTLE_SECONDS = 1.5      # a session turns idle just before its Stop event lands
 HAT_GAP_SECONDS = 1.5     # short "thinking" gaps between tools keep the hat on
 
 # Which session is shown when there are several; the latest wins a tie.
@@ -114,16 +115,17 @@ def session_mode(s, now, live=None, gone=False):
     age = now - ts
     status = (live or {}).get("status")
     moved_on = bool(live) and live["since"] > ts   # Claude Code changed state after the last event
+    stopped = moved_on and status == "idle" and now - live["since"] >= SETTLE_SECONDS   # and no Stop came
 
     if raw == "waiting":
         if moved_on and status == "busy":     # you said yes
             return s.get("resume") or "thinking"
-        if moved_on and status == "idle":     # you said no, or pressed Esc
+        if stopped:                           # you said no, or pressed Esc
             return _resting(now - live["since"])
         if status != "waiting" and age > LOST_WAIT_SECONDS:
             return "sleep"
         return "waiting"
-    if raw in BUSY_MODES and moved_on and status == "idle":   # Esc: no Stop event
+    if raw in BUSY_MODES and stopped:         # Esc: no Stop event
         return _resting(now - live["since"])
     if raw == "done":
         return "done" if age < DONE_SECONDS else _resting(age)
