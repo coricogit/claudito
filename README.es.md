@@ -5,7 +5,7 @@ haciendo [Claude Code](https://claude.com/claude-code), con un sombrero o casco
 distinto para cada tipo de trabajo.
 
 *[Read in English](README.md)* · ¿Usas KDE Plasma? Los widgets de Plasma están
-en la rama [`main`](https://github.com/coricogit/claudito/tree/main).
+en [esta versión](https://github.com/coricogit/claudito/tree/ab9e865): después de clonar, ejecuta `git checkout ab9e865`.
 
 | Claude Code está… | Sombrero | Animación |
 |---|---|---|
@@ -34,7 +34,7 @@ la aplicación de escritorio de Claude. Las sesiones en la nube no ejecutan tus
 hooks locales, así que Claudito no se entera de ellas.
 
 ```powershell
-git clone -b windows-terminal https://github.com/coricogit/claudito.git $HOME\src\claudito
+git clone https://github.com/coricogit/claudito.git $HOME\src\claudito
 py $HOME\src\claudito\windows\install.py
 ```
 

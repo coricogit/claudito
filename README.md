@@ -5,7 +5,7 @@ A little character on your Windows desktop that shows what
 or helmet for each kind of work.
 
 *[Leer en español](README.es.md)* · Using KDE Plasma? The Plasma widgets are
-on the [`main`](https://github.com/coricogit/claudito/tree/main) branch.
+at [this version](https://github.com/coricogit/claudito/tree/ab9e865): after cloning, run `git checkout ab9e865`.
 
 | Claude Code is… | Hat | Animation |
 |---|---|---|
@@ -34,7 +34,7 @@ desktop app. Cloud sessions don't run your local hooks, so Claudito can't see
 them.
 
 ```powershell
-git clone -b windows-terminal https://github.com/coricogit/claudito.git $HOME\src\claudito
+git clone https://github.com/coricogit/claudito.git $HOME\src\claudito
 py $HOME\src\claudito\windows\install.py
 ```
 
