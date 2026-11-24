@@ -35,6 +35,7 @@ import install  # noqa: E402  (autostart helpers)
 import limits  # noqa: E402
 import seasons  # noqa: E402
 import tray_sprites  # noqa: E402
+import updater  # noqa: E402
 
 QML_DIR = os.path.join(HERE, "qml")
 TOAST_MS = 5000   # how long a notification stays up
@@ -58,6 +59,8 @@ TEXT = {
         "toastWaiting": "Claude needs you", "toastWaitingText": "It is waiting for your answer.",
         "toastDone": "Claude has finished", "toastDoneText": "It took {time}.",
         "autostart": "Start with Windows",
+        "update": "Update automatically",
+        "toastUpdated": "Claudito has been updated", "toastUpdatedText": "You now have version {version}.",
         "quit": "Quit",
         "tipToday": "Today: {out} tokens written",
         "tipLimits": "Plan: {limits}",
@@ -80,6 +83,8 @@ TEXT = {
         "toastWaiting": "Claude te necesita", "toastWaitingText": "Está esperando tu respuesta.",
         "toastDone": "Claude ha terminado", "toastDoneText": "Ha tardado {time}.",
         "autostart": "Iniciar con Windows",
+        "update": "Actualizar automáticamente",
+        "toastUpdated": "Claudito se ha actualizado", "toastUpdatedText": "Ya tienes la versión {version}.",
         "quit": "Salir",
         "tipToday": "Hoy: {out} tokens escritos",
         "tipLimits": "Plan: {limits}",
@@ -364,6 +369,100 @@ def tray_pixmap(mood, waiting=False, size=32, hat="", outfit=""):
 
 
 # ---------------------------------------------------------------------------
+# Updates of an installed copy (windows/updater.py)
+# ---------------------------------------------------------------------------
+
+class Updates(QObject):
+    """Looks for a new version now and then, and installs it at a quiet moment."""
+
+    FIRST_MS = 60_000             # after starting: the network may not be up yet
+    EVERY_MS = 6 * 3600 * 1000
+    LOOK_MS = 15_000              # with an update ready, how often to see if it is a quiet moment
+    QUIET_LOOKS = 4               # how many in a row it has to be
+    _ready = Signal(object)
+
+    def __init__(self, parent, settings, version, quiet, leave):
+        """`quiet` says if nobody would miss Claudito now; `leave` closes it."""
+        super().__init__(parent)
+        self.settings = settings
+        self.version = version
+        self.quiet = quiet
+        self.leave = leave
+        self.folder = os.path.join(compat.data_dir(), "update")
+        self._worker = None
+        self._found = None        # (version, path of its installer, its SHA-256)
+        self._looks = 0
+        self._ready.connect(self._set_ready)
+        self._check_timer = QTimer(self, interval=self.EVERY_MS, timeout=self.check)
+        self._look_timer = QTimer(self, interval=self.LOOK_MS, timeout=self._look)
+        if self.enabled():
+            self._check_timer.start()
+            QTimer.singleShot(self.FIRST_MS, self.check)
+
+    def enabled(self):
+        return self.settings.value("autoUpdate", True, type=bool)
+
+    def set_enabled(self, on):
+        self.settings.setValue("autoUpdate", on)
+        if on:
+            self._check_timer.start()
+            self.check()
+        else:
+            self._check_timer.stop()
+            self._look_timer.stop()
+            self._found = None
+
+    def just_updated(self):
+        """True the first time a new version runs."""
+        before = self.settings.value("version", "")
+        self.settings.setValue("version", self.version)
+        return bool(before) and before != self.version
+
+    def check(self):
+        if not self.enabled() or (self._worker and self._worker.is_alive()):
+            return
+        tried = self.settings.value("updateTries", "")
+        self._worker = threading.Thread(target=self._download, args=(tried,), daemon=True)
+        self._worker.start()
+
+    def _download(self, tried):
+        try:
+            found = updater.download(self.version, self.folder,
+                                     skip=lambda v: updater.tries(tried, v) >= updater.MAX_TRIES)
+        except updater.Offline:
+            return
+        except Exception:
+            log_error("update failed")
+            return
+        if found:
+            self._ready.emit(found)
+
+    def _set_ready(self, found):
+        if self.enabled():
+            self._found, self._looks = found, 0
+            self._look_timer.start()
+
+    def _look(self):
+        self._looks = self._looks + 1 if self.quiet() else 0
+        if self._looks >= self.QUIET_LOOKS:
+            self._look_timer.stop()
+            self._install()
+
+    def _install(self):
+        (version, path, digest), self._found = self._found, None
+        # Counted before trying: what happens next may well close this app.
+        self.settings.setValue("updateTries", updater.count_try(self.settings.value("updateTries", ""), version))
+        self.settings.sync()
+        try:
+            process = updater.run(path, digest, os.path.join(compat.data_dir(), "update.log"))
+        except Exception:
+            log_error("update failed")
+            return
+        # The installer closes Claudito anyway, but then its icon would stay in the tray.
+        QTimer.singleShot(1000, lambda: self.leave() if process.poll() is None else None)
+
+
+# ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
 
@@ -393,6 +492,8 @@ class Claudito(QObject):
         self._full_timer = QTimer(self, interval=1000, timeout=self._check_fullscreen)
         self._full_timer.start()
 
+        version = updater.installed_version()
+        self.updates = Updates(self, self.settings, version, self._quiet, self._leave) if version else None
         self._build_tray()
         self.backend.menuRequested.connect(lambda: self.menu.popup(QCursor.pos()))
         self._toast_timer = QTimer(self, singleShot=True, interval=TOAST_MS, timeout=self._hide_toast)
@@ -401,6 +502,8 @@ class Claudito(QObject):
         self.backend.activityChanged.connect(self._update_tray)
         self.backend.clothesChanged.connect(self._update_tray)
         self._update_tray()
+        if self.updates and self.updates.just_updated():
+            self._toast(tr("toastUpdated"), tr("toastUpdatedText").format(version=version), self._icon("happy", size=64))
 
     def _load(self, name):
         self.engine.load(QUrl.fromLocalFile(os.path.join(QML_DIR, name)))
@@ -556,6 +659,12 @@ class Claudito(QObject):
             auto.toggled.connect(lambda on: install.set_autostart(on))
             menu.addAction(auto)
 
+        if self.updates:
+            update = QAction(tr("update"), menu, checkable=True)
+            update.setChecked(self.updates.enabled())
+            update.toggled.connect(self.updates.set_enabled)
+            menu.addAction(update)
+
         menu.addSeparator()
         quit_action = QAction(tr("quit"), menu)
         quit_action.triggered.connect(self.app.quit)
@@ -585,7 +694,10 @@ class Claudito(QObject):
         if view["project"]:
             title += " · " + view["project"]
         mood = "worried" if kind == "waiting" else "happy"
-        self.tray.showMessage(title, text, self._icon(mood, waiting=kind == "waiting", size=64), TOAST_MS)
+        self._toast(title, text, self._icon(mood, waiting=kind == "waiting", size=64))
+
+    def _toast(self, title, text, icon):
+        self.tray.showMessage(title, text, icon, TOAST_MS)
         if compat.IS_WINDOWS:
             self._toast_timer.start()   # counts again if one was already up
 
@@ -593,6 +705,17 @@ class Claudito(QObject):
         # Windows ignores the time asked for. An empty message takes the
         # notification away, also from the notification center.
         self.tray.showMessage("", "", QIcon(), 0)
+
+    # ----- updates -----
+    def _quiet(self):
+        """Nobody would miss Claudito for a few seconds. Claude Code has to be
+        at rest too: its hooks use the files that an update replaces."""
+        return (self.backend.mode in ("idle", "sleep") and not self._covered
+                and not self.panel.isVisible() and not self.menu.isVisible())
+
+    def _leave(self):
+        self.tray.hide()
+        self.app.quit()
 
     def _icon(self, mood, **kw):
         return QIcon(tray_pixmap(mood, hat=self.backend.seasonHat, outfit=self.backend.seasonOutfit, **kw))

@@ -43,6 +43,8 @@ en.Autostart=Start Claudito when I log in
 es.Autostart=Abrir Claudito al iniciar sesión
 en.Connecting=Connecting Claudito to Claude Code...
 es.Connecting=Conectando Claudito con Claude Code...
+en.InUse=Claudito's files are in use. Close your Claude Code sessions and run this installer again.
+es.InUse=Los archivos de Claudito están en uso. Cierra tus sesiones de Claude Code y vuelve a ejecutar este instalador.
 en.ConnectFailed=Claudito is installed, but it could not be connected to Claude Code. Is the file settings.json in your .claude folder valid? After fixing it, run this installer again.%n%nDetails:%n%1
 es.ConnectFailed=Claudito está instalado, pero no se pudo conectar con Claude Code. ¿Es válido el archivo settings.json de tu carpeta .claude? Cuando lo arregles, vuelve a ejecutar este instalador.%n%nDetalles:%n%1
 
@@ -56,10 +58,7 @@ es.FinishedLabelNoIcons=Claudito está instalado.%n%nLas sesiones nuevas de Clau
 Name: "autostart"; Description: "{cm:Autostart}"
 
 [InstallDelete]
-; Nothing of an older version may stay behind.
-Type: filesandordirs; Name: "{app}\python"
-Type: filesandordirs; Name: "{app}\windows"
-Type: filesandordirs; Name: "{app}\plasma"
+; Nothing of an older version may stay behind. For the rest, see MoveAway below.
 Type: filesandordirs; Name: "{app}\__pycache__"
 
 [Files]
@@ -81,39 +80,149 @@ Type: filesandordirs; Name: "{app}\windows"
 Type: filesandordirs; Name: "{app}\plasma"
 Type: filesandordirs; Name: "{app}\__pycache__"
 Type: files; Name: "{app}\install.log"
+Type: filesandordirs; Name: "{app}\*.old"
 Type: dirifempty; Name: "{app}"
 
 [Code]
+// The older version is moved away, not deleted, until the new one is in place:
+// if something goes wrong it is put back.
+const
+  LastPart = 6;
+
+var
+  AppDir: String;
+  Moved, Installed: Boolean;
+
+// Run by Claudito itself (windows/updater.py), with nobody watching.
+function Updating: Boolean;
+begin
+  Result := ExpandConstant('{param:UPDATE|0}') = '1';
+end;
+
+function Part(I: Integer): String;
+begin
+  case I of
+    0: Result := 'python';
+    1: Result := 'windows';
+    2: Result := 'plasma';
+    3: Result := 'claudito-hook';
+    4: Result := 'claudito-statusline';
+    5: Result := 'claudito-usage';
+  else
+    Result := 'version.txt';
+  end;
+  Result := AppDir + '\' + Result;
+end;
+
+function Exists(Path: String): Boolean;
+begin
+  Result := FileExists(Path) or DirExists(Path);
+end;
+
+procedure Remove(Path: String);
+begin
+  if DirExists(Path) then
+    DelTree(Path, True, True, True)
+  else if FileExists(Path) then
+    DeleteFile(Path);
+end;
+
+procedure PutBack;
+var
+  I: Integer;
+begin
+  for I := 0 to LastPart do
+    if Exists(Part(I) + '.old') then
+    begin
+      Remove(Part(I));
+      if not RenameFile(Part(I) + '.old', Part(I)) then
+        Log('Could not put back ' + Part(I));
+    end;
+end;
+
+// Fails, with everything as it was, if a file is in use.
+function MoveAway: Boolean;
+var
+  I: Integer;
+begin
+  Result := True;
+  for I := 0 to LastPart do
+    if Exists(Part(I)) then
+    begin
+      Remove(Part(I) + '.old');
+      if not RenameFile(Part(I), Part(I) + '.old') then
+      begin
+        Log('In use: ' + Part(I));
+        PutBack;
+        Result := False;
+        exit;
+      end;
+    end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
-  Code: Integer;
+  Code, Attempt: Integer;
 begin
   Result := '';
+  AppDir := ExpandConstant('{app}');
   // An older version of this installer is there: its files are in use.
   if FileExists(ExpandConstant('{#Setup}')) then
     Exec(ExpandConstant('{#Py}'), ExpandConstant('"{#Setup}" --stop'), '', SW_HIDE, ewWaitUntilTerminated, Code);
+  // Claude Code's hooks use them too, for a moment.
+  for Attempt := 1 to 40 do
+  begin
+    Moved := MoveAway;
+    if Moved then
+      exit;
+    Sleep(500);
+  end;
+  Result := CustomMessage('InUse');
+end;
+
+procedure DeinitializeSetup;
+var
+  I, Code: Integer;
+  Dir: String;
+begin
+  if Moved then
+    if Installed then
+      for I := 0 to LastPart do
+        Remove(Part(I) + '.old')
+    else
+      PutBack;
+  if Updating then
+  begin
+    // The new version, or the old one if this failed.
+    Dir := ExpandConstant('{param:DIR}');
+    Exec(Dir + '\python\pythonw.exe', '"' + Dir + '\windows\claudito.pyw"', Dir + '\windows', SW_SHOWNORMAL,
+      ewNoWait, Code);
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Code: Integer;
-  Params, Log: String;
+  Params, LogFile: String;
   Text: AnsiString;
 begin
   if CurStep <> ssPostInstall then
     exit;
+  Installed := True;
   WizardForm.StatusLabel.Caption := CustomMessage('Connecting');
-  Log := ExpandConstant('{app}\install.log');
+  LogFile := ExpandConstant('{app}\install.log');
   // --stop: a copy run from the source code would keep this one from starting.
-  Params := ExpandConstant('"{#Setup}" --stop --no-start --log "') + Log + '"';
-  if not WizardIsTaskSelected('autostart') then
+  Params := ExpandConstant('"{#Setup}" --stop --no-start --log "') + LogFile + '"';
+  if Updating then
+    Params := Params + ' --keep-autostart'   // it may have been changed in the menu
+  else if not WizardIsTaskSelected('autostart') then
     Params := Params + ' --no-autostart';
   if not Exec(ExpandConstant('{#Py}'), Params, '', SW_HIDE, ewWaitUntilTerminated, Code) then
     Code := -1;
   if Code <> 0 then
   begin
     Text := '';
-    LoadStringFromFile(Log, Text);
-    SuppressibleMsgBox(FmtMessage(CustomMessage('ConnectFailed'), [Log]), mbError, MB_OK, IDOK);
+    LoadStringFromFile(LogFile, Text);
+    SuppressibleMsgBox(FmtMessage(CustomMessage('ConnectFailed'), [LogFile]), mbError, MB_OK, IDOK);
   end;
 end;

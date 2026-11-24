@@ -6,6 +6,11 @@ Needs any Python 3.9+ with pip, and an internet connection the first time.
 Nothing is installed on this computer: Python, Qt and Inno Setup are downloaded
 to installer\\build (checked against the hashes below) and used from there.
 
+To publish it, so that the installed copies update themselves to it, the tag
+has to be v<version> and the file has to keep its name:
+
+    gh release create v<version> installer\\dist\\Claudito-Setup-<version>.exe
+
 The installer carries the official embeddable Python and only the parts of Qt
 that Claudito uses, next to Claudito's own files as they are in the repository.
 """
@@ -145,6 +150,7 @@ def main():
     say("Claudito " + version)
     fresh(STAGE)
     stage_claudito()
+    copy(os.path.join(HERE, "version.txt"), os.path.join(STAGE, "version.txt"))
     python = stage_python()
     stage_qt(python)
     say("Icon")

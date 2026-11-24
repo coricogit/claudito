@@ -31,8 +31,12 @@ Download **Claudito-Setup** from the
 [latest release](https://github.com/coricogit/claudito/releases/latest) and run
 it. It doesn't need Python or administrator rights, connects Claudito to Claude
 Code and can be removed from *Settings > Apps*. It isn't signed, so Windows may
-show a blue "Windows protected your PC" notice: *More info > Run anyway*. To
-update, run the installer of the new version.
+show a blue "Windows protected your PC" notice: *More info > Run anyway*.
+
+From version 1.1.0 on it updates itself: it looks for a new version on GitHub
+every few hours, checks the download and installs it when Claude Code is at
+rest. Turn it off with *Update automatically* in the tray menu. Version 1.0.0
+doesn't do this yet: run the new installer once.
 
 You need Claude Code running on this computer: the `claude` command in a
 terminal, or a **Local** session in the Code tab of the Claude desktop app.
@@ -143,7 +147,7 @@ Click the tray icon for:
 
 It closes when you click elsewhere. Everything comes from files Claude Code
 keeps on your computer (`~/.claude.json` and the session histories in
-`~/.claude\projects`); nothing is sent anywhere. Plan limits come from Claude
+`~/.claude\projects`); none of it is sent anywhere. Plan limits come from Claude
 Code's status line, which the terminal runs and the Code tab of the Claude
 desktop app doesn't: they show once a terminal session has reported them.
 
@@ -163,6 +167,7 @@ it:
 | Plan limits on the tray icon | `windows\limits.py` | `claudito-usage` |
 | Seasons | `windows\seasons.py` | `Character.qml`, `sprites.js` |
 | Full-screen detection | `windows\fullscreen.py` | — |
+| Updates (installed copy only) | `windows\updater.py` | — |
 | App and tray | `windows\claudito.pyw` | — |
 
 `windows\compat.py` points the scripts' `$XDG_RUNTIME_DIR` and

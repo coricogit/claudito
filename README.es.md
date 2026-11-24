@@ -32,8 +32,12 @@ Descarga **Claudito-Setup** de la
 ejecútalo. No necesita Python ni permisos de administrador, conecta Claudito
 con Claude Code y se quita desde *Configuración > Aplicaciones*. No está
 firmado, así que Windows puede mostrar el aviso azul «Windows protegió su PC»:
-*Más información > Ejecutar de todas formas*. Para actualizar, ejecuta el
-instalador de la versión nueva.
+*Más información > Ejecutar de todas formas*.
+
+Desde la versión 1.1.0 se actualiza solo: cada pocas horas busca una versión
+nueva en GitHub, comprueba la descarga y la instala cuando Claude Code está en
+reposo. Se desactiva con *Actualizar automáticamente* en el menú de la bandeja.
+La 1.0.0 todavía no lo hace: ejecuta una vez el instalador nuevo.
 
 Hace falta que Claude Code se ejecute en este ordenador: el comando `claude` en
 una terminal o una sesión **Local** en la pestaña Code de la aplicación de
@@ -148,7 +152,7 @@ Haz clic en el icono de la bandeja para ver:
 
 Se cierra al hacer clic fuera. Todo sale de archivos que Claude Code guarda en
 tu ordenador (`~/.claude.json` y los historiales de sesión de
-`~/.claude\projects`); no se envía nada a ningún sitio. Los límites del plan
+`~/.claude\projects`); no se envía nada de eso a ningún sitio. Los límites del plan
 llegan por la línea de estado de Claude Code, que se ejecuta en la terminal
 pero no en la pestaña Code de la aplicación de escritorio de Claude: aparecen
 cuando una sesión de terminal los comunica.
@@ -169,6 +173,7 @@ copiarlo:
 | Límites del plan en la bandeja | `windows\limits.py` | `claudito-usage` |
 | Estaciones | `windows\seasons.py` | `Character.qml`, `sprites.js` |
 | Detección de pantalla completa | `windows\fullscreen.py` | — |
+| Actualizaciones (solo la copia instalada) | `windows\updater.py` | — |
 | Aplicación y bandeja | `windows\claudito.pyw` | — |
 
 `windows\compat.py` apunta `$XDG_RUNTIME_DIR` y `$XDG_CACHE_HOME` de los

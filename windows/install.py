@@ -16,6 +16,7 @@ What it does:
   - starts Claudito now
 """
 import argparse
+import copy
 import json
 import os
 import shutil
@@ -129,7 +130,8 @@ def add_hooks(data, cmd):
 
 
 def install_settings(path):
-    data = remove_hooks(load_settings(path))
+    before = load_settings(path)
+    data = remove_hooks(copy.deepcopy(before))
     add_hooks(data, command(HOOK))
     print("Hooked:", " ".join(EVENTS))
     current = (data.get("statusLine") or {}).get("command", "")
@@ -139,6 +141,9 @@ def install_settings(path):
     else:
         print(f"You already have a status line ({current}); left as is.")
         print("Without Claudito's status line the usage panel can't show plan limits or the live session.")
+    if data == before:   # an update, most likely: keep the older backup
+        print("Nothing to change.")
+        return
     save_settings(path, data)
     print(f"(backup of the previous file: {path}.claudito-backup)")
 
@@ -235,6 +240,7 @@ def main():
     ap = argparse.ArgumentParser(description="Install Claudito for Windows.")
     ap.add_argument("--uninstall", action="store_true", help="remove hooks, status line and autostart")
     ap.add_argument("--no-autostart", action="store_true", help="don't start Claudito when you log in")
+    ap.add_argument("--keep-autostart", action="store_true", help="don't change whether it starts when you log in")
     ap.add_argument("--no-start", action="store_true", help="don't start Claudito now")
     ap.add_argument("--stop", action="store_true", help="close Claudito first; alone, do nothing else")
     ap.add_argument("--purge", action="store_true", help="with --uninstall, also delete Claudito's data and settings")
@@ -269,7 +275,7 @@ def main():
     step(f"Claude Code hooks ({path})")
     install_settings(path)
 
-    if os.name == "nt":
+    if os.name == "nt" and not args.keep_autostart:
         step("Autostart")
         set_autostart(not args.no_autostart)
         print("Claudito starts when you log in." if not args.no_autostart else "Autostart off.")

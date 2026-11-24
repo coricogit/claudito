@@ -1,5 +1,8 @@
 """py -m unittest discover -s windows/tests"""
+import contextlib
 import datetime as dt
+import hashlib
+import io
 import json
 import os
 import re
@@ -14,9 +17,11 @@ sys.path.insert(0, WINDOWS)
 
 import activity  # noqa: E402
 import fullscreen  # noqa: E402
+import install  # noqa: E402
 import limits  # noqa: E402
 import seasons  # noqa: E402
 import tray_sprites  # noqa: E402
+import updater  # noqa: E402
 
 HOOK = os.path.join(WINDOWS, "claudito_hook.py")
 NOW = 1_000_000.0
@@ -439,6 +444,110 @@ class Seasons(unittest.TestCase):
                 self.assertTrue(rows)
                 self.assertEqual({len(r) for r in rows}, {26}, season)
                 self.assertLessEqual(set("".join(rows)) - {"."}, colors, season)
+
+
+class Updater(unittest.TestCase):
+    SETUP = b"the new installer"
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = os.path.join(tmp.name, "update")
+        self.fetched = []
+
+    def release(self, version="1.2.0", asset=(), **fields):
+        name = f"Claudito-Setup-{version}.exe"
+        return {"tag_name": "v" + version, "draft": False, "prerelease": False, "assets": [
+            {"name": name, "digest": "sha256:" + hashlib.sha256(self.SETUP).hexdigest(),
+             "browser_download_url": f"{updater.DOWNLOADS}v{version}/{name}", **dict(asset)}], **fields}
+
+    def fetch(self, release, setup=SETUP):
+        def fetch(url, path):
+            self.fetched.append(url)
+            with open(path, "wb") as f:
+                f.write(json.dumps(release).encode() if url == updater.LATEST else setup)
+        return fetch
+
+    def newer(self, release, current="1.1.0"):
+        found = updater.newer_release(json.dumps(release), current)
+        return found and found[0]
+
+    def test_versions(self):
+        self.assertEqual(self.newer(self.release("1.2.0")), "1.2.0")
+        self.assertEqual(self.newer(self.release("1.10.0"), "1.9.0"), "1.10.0")
+        self.assertEqual(self.newer(self.release("1.1.0.1")), "1.1.0.1")
+        for version in ("1.1.0", "1.1", "1.0.9", "0.9", "1.2.0-beta", "next", ""):
+            self.assertIsNone(self.newer(self.release(version)), version)
+
+    def test_what_is_not_trusted(self):
+        other = "https://github.com/someone/claudito/releases/download/v1.2.0/Claudito-Setup-1.2.0.exe"
+        for release in (self.release(asset={"digest": None}), self.release(asset={"digest": "sha256:12"}),
+                        self.release(asset={"digest": "md5:" + "0" * 64}), self.release(asset={"name": "other.exe"}),
+                        self.release(asset={"browser_download_url": other}), self.release(draft=True),
+                        self.release(prerelease=True), {**self.release(), "assets": None},
+                        {**self.release(), "assets": [1]}, {**self.release(), "tag_name": None},
+                        [], None, {"message": "rate limit"}):
+            self.assertIsNone(self.newer(release), release)
+        self.assertIsNone(updater.newer_release("<html>", "1.1.0"))
+
+    def test_download(self):
+        version, path, digest = updater.download("1.1.0", self.dir, fetch=self.fetch(self.release()))
+        self.assertEqual((version, updater.sha256(path)), ("1.2.0", digest))
+        updater.download("1.1.0", self.dir, fetch=self.fetch(self.release()))
+        self.assertEqual(len(self.fetched), 3)   # the installer, only once
+        self.assertIsNone(updater.download("1.2.0", self.dir, fetch=self.fetch(self.release())))
+        self.assertFalse(os.path.exists(self.dir))
+
+    def test_wrong_file(self):
+        with self.assertRaises(ValueError):
+            updater.download("1.1.0", self.dir, fetch=self.fetch(self.release(), b"something else"))
+        self.assertEqual(os.listdir(self.dir), ["latest.json"])
+
+    def test_changed_after_downloading(self):
+        _, path, digest = updater.download("1.1.0", self.dir, fetch=self.fetch(self.release()))
+        with open(path, "ab") as f:
+            f.write(b"!")
+        with self.assertRaises(ValueError):
+            updater.run(path, digest, "log")
+
+    def test_gives_up(self):
+        saved = updater.count_try(updater.count_try("", "1.2.0"), "1.2.0")
+        self.assertEqual(updater.tries(saved, "1.2.0"), 2)
+        self.assertEqual(updater.tries(saved, "1.3.0"), 0)
+        for saved in ("1.2.0:2:2020-01-01", "", None, "1.2.0", "1.2.0:x:" + updater.today()):
+            self.assertEqual(updater.tries(saved, "1.2.0"), 0, saved)
+        self.assertIsNone(updater.download("1.1.0", self.dir, skip=lambda v: v == "1.2.0",
+                                           fetch=self.fetch(self.release())))
+        self.assertEqual(self.fetched, [updater.LATEST])
+
+    def test_source_code_is_not_updated(self):
+        self.assertEqual(updater.installed_version(), "")
+
+    @unittest.skipUnless(os.name == "nt", "Windows")
+    def test_installed_version(self):
+        os.makedirs(os.path.join(self.dir, "python"))
+        for name, text in (("python/pythonw.exe", ""), ("version.txt", "1.1.0\r\n")):
+            with open(os.path.join(self.dir, name), "w", newline="") as f:
+                f.write(text)
+        self.assertEqual(updater.installed_version(self.dir), "1.1.0")
+
+
+class Settings(unittest.TestCase):
+    def test_nothing_to_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "settings.json")
+            with open(path, "w") as f:
+                json.dump({"model": "opus", "hooks": {"Stop": [{"hooks": [{"command": "mine"}]}]}}, f)
+            with contextlib.redirect_stdout(io.StringIO()):
+                install.install_settings(path)
+                with open(path) as f:
+                    first = f.read()
+                os.remove(path + ".claudito-backup")
+                install.install_settings(path)
+            with open(path) as f:
+                self.assertEqual(f.read(), first)
+            self.assertIn("mine", first)
+            self.assertFalse(os.path.exists(path + ".claudito-backup"))
 
 
 if __name__ == "__main__":
